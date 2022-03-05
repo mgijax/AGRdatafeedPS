@@ -1,0 +1,5 @@
+#!/bin/bash
+
+TOKEN=`cat ~/.DQM_UPLOAD_TOKEN`
+curl -H "Authorization: Bearer ${TOKEN}" -X POST "https://fms.alliancegenome.org/api/data/submit" -F "5.1.1_CURATION-DAF_MGI=@MGI_ps_disease_annotation.json"
+
