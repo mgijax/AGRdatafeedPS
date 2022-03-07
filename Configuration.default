@@ -1,0 +1,50 @@
+# 
+#
+if [ "${MGICONFIG}" = "" ]
+then
+    export MGICONFIG=/usr/local/mgi/live/mgiconfig
+fi
+source ${MGICONFIG}/master.config.sh
+
+export AGR_CURATION_SCHEMA="agr_curation_schema"
+export AGR_CURATION_SCHEMA_URL="https://github.com/alliance-genome/agr_curation_schema"
+
+export SCHEMA_VERSION="v1.1.2"
+export RELEASE_VERSION="5.1.1"
+
+# ---------------------
+# Echos its arguments to the log file. Prepends a datetime stamp.
+#
+logit () {
+  if [[ ${LOGFILE} ]] ; then
+      echo `date` "$*" >> ${LOGFILE}
+  else
+      echo `date` "$*" 
+  fi
+}
+
+# ---------------------
+# Logs a message and exits with error code 1.
+#
+die () {
+    logit "$*"
+    exit 1
+}
+
+# ---------------------
+# If the exit code of the last command ($?) is not zero, 
+# either exits with an error message (the default) or
+# echos a warning and continues (if called with -w).
+#
+checkexit () {
+    c=$?
+    if [ $c -ne 0 ]; then
+	if [ "$1" == "-w" ] ; then
+	    shift
+	    logit "WARNING: nonzero exit code detected." "$*"
+	else
+	    die "ERROR: $*" 
+	fi
+    fi  
+    return 0
+}

@@ -1,0 +1,35 @@
+
+source Configuration
+
+logit "Cloning ${AGR_CURATION_SCHEMA} from ${AGR_CURATION_SCHEMA_URL}"
+git clone "${AGR_CURATION_SCHEMA_URL}"
+checkexit
+
+cd ${AGR_CURATION_SCHEMA}
+
+logit "Checkout out ${SCHEMA_VERSION}"
+git checkout ${SCHEMA_VERSION}
+checkexit
+
+rm -fr venv
+
+logit "Creating virtual environment."
+${PYTHON} -m venv venv
+checkexit
+
+source venv/bin/activate
+export PYTHONPATH=.:$PYTHONPATH
+
+logit "Upgrading pip."
+pip install --upgrade pip
+checkexit
+
+logit "Installing pipenv"
+pip install pipenv
+checkexit
+
+logit "pip install -e ."
+pip install -e .
+checkexit 
+
+deactivate

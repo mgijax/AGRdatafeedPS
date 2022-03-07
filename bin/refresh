@@ -1,5 +1,251 @@
 #!/bin/bash
 
-TOKEN=`cat ~/.DQM_UPLOAD_TOKEN`
-curl -H "Authorization: Bearer ${TOKEN}" -X POST "https://fms.alliancegenome.org/api/data/submit" -F "5.1.1_CURATION-DAF_MGI=@MGI_ps_disease_annotation.json"
+# ---------------------
+if [ ! -r ../Configuration ] ; then
+    echo "Cannot read Configuration file."
+    exit 1
+fi
+source ../Configuration
 
+# ---------------------
+# Initialize vars
+LOGFILE=""
+OUTPUT_DIR="."
+RELEASE_COUNT=""
+DO_ALL="true"
+VALIDATOR_DIR="../agr_curation_schema"
+DO_GENERATE=""
+DO_VALIDATE=""
+DO_UPLOAD=""
+TOKEN_FILE=""
+NO_RUN=""
+
+# ---------------------
+function usage {
+  logit "
+Usage: $0 [-d output_directory][-p d][-g][-v dir][-u file]
+
+Installation settings:
+    RELEASE_VERSION=${RELEASE_VERSION}
+    SCHEMA_VERSION=${SCHEMA_VERSION}
+	
+Options:
+-h	Print this message and exit.
+-C file	Sources the specified config file.
+-l file Specifies a log file. By default, log messages are sent to stdout.
+
+-c n	Specifies the update count for this schema version (1, 2, 3, ...).  Optional.
+-d dir	Specifies the parent directory where the output directory will be created.
+	Default = current working directory.
+-p pts	Specify which part(s) to run. Argument is a comma-separated list (no spaces) of any of the following:
+	d	Disease annotations
+	If no -p option is provided, all parts are run.
+
+You need to specify at least one of the following options to actually do anything:
+-g      Generate data files specified in -p option.
+-v dir	Validate data files specified in -p option. Argument = directory where validator is installed.
+-u file Upload files specified in -p option to the Alliance submission endpoint. 
+	Argument is the file containing the DQM access token.
+
+Debugging:
+-N	No execute. Skips actually running commands; just prints what it would do.
+"
+}
+
+# ---------------------------------------
+function setFile {
+  ftype="$1"
+  if [[ ${ftype} == "GFF" ]] ; then
+      FILE="${ROOT}_${ftype}.gff3"
+  elif [[ ${ftype} == "assembly" ]] ; then
+      FILE="${ROOT}_${ftype}.fa.gz"
+  else
+      FILE="${ROOT}_${ftype}.json"
+  fi
+}
+
+# ---------------------------------------
+function generate {
+  ftype="$1"
+  script="$2"
+  setFile ${ftype}
+  logit "Generating ${ftype} file: ${FILE} with command: ${script}"
+  if [[ ${NO_RUN} ]] ; then
+    return
+  fi
+  if [[ ${ftype} == "GFF" ]] ; then
+      if [[ ${DO_GENERATE} ]] ; then
+	  url=${script}
+	  curl ${url} | gunzip > ${FILE}
+      fi
+  elif [[ ${ftype} == "assembly" ]] ; then
+      return
+  else
+      if [[ ${DO_GENERATE} ]] ; then
+	  ${PYTHON} ${script} > ${FILE}
+	  checkexit
+      fi
+  fi
+}
+
+# ---------------------
+# Run the agr validator. 
+# Args:
+#  $1 = path (from the schema directory) to the curation schema file
+#  $2 = full path to the file
+function validate {
+  ftype=$1
+  setFile ${ftype}
+  logit "Validating ${FILE} ..."
+  if [[ ${NO_RUN} ]] ; then
+    return
+  fi
+  #
+  # ASSUMES the validor is checked out to the correct schema version!
+  #
+  source 
+  ${PYTHON2} /util/agr_validate.py -i ${FILE}
+  checkexit 
+  logit "Validated: ${FILE}"
+}
+# ---------------------
+function upload {
+  ftype=$1
+  aftype=$2
+  setFile ${ftype}
+  logit "Uploading file to AGR: ${RELEASE_VERSION}_${aftype}_MGI=@${FILE} ..."
+  token=`cat ${TOKEN_FILE}`
+  if [[ ${NO_RUN} ]] ; then
+    return
+  fi
+#curl -H "Authorization: Bearer ${TOKEN}" -X POST "https://fms.alliancegenome.org/api/data/submit" -F "5.1.1_CURATION-DAF_MGI=@MGI_ps_disease_annotation.json"
+  curl \
+      -H "Authorization: Bearer ${token}" \
+      -X POST "https://fms.alliancegenome.org/api/data/submit" \
+      -F "${RELEASE_VERSION}_${aftype}_MGI=@${FILE}"
+  checkexit
+  logit "Uploaded: ${FILE}"
+}
+
+# ---------------------------------------
+function doPart {
+  part="$1"
+  script="$2"
+  ftype="$3"
+  allianceftype="$4"
+  if [[ ${DO_ALL} || " ${PARTS[*]} " == *" ${part} "* ]]; then
+      if [[ ${DO_GENERATE} ]] ; then
+	  generate "${ftype}" "${script}"
+      fi
+      if [[ ${DO_VALIDATE} ]] ; then
+	  validate "${ftype}"
+      fi
+      if [[ ${DO_UPLOAD} ]] ; then
+	  upload "${ftype}" "${allianceftype}"
+      fi
+  else
+      logit "Skipping ${ftype}."
+  fi
+}
+
+# ---------------------------------------
+function parseCommandLine {
+    # Process command line args
+    until [ -z "$1" ] 
+    do
+	case "$1" in
+	-h)
+	    usage
+	    exit 0
+	    ;;
+	-l)
+	    shift
+	    LOGFILE="$1"
+	    ;;
+	-g)
+	    DO_GENERATE="true"
+	    ;;
+	-v) 
+	    DO_VALIDATE="true"
+	    ;;  
+	-u) 
+	    shift
+	    TOKEN_FILE="$1"
+	    DO_UPLOAD="true"
+	    ;;  
+	-p)
+	    shift
+	    PARTS=(${1//,/ })
+	    DO_ALL=""
+	    ;;
+	-d) 
+	    shift
+	    OUTPUT_DIR="$1"
+	    ;;  
+	-s) 
+	    shift
+	    SCHEMA_VERSION="$1"
+	    ;;  
+	-R) 
+	    shift
+	    RELEASE_VERSION="$1"
+	    ;;  
+	-c) 
+	    shift
+	    RELEASE_COUNT="$1"
+	    ;;  
+	-N)
+	    NO_RUN="true"
+	    ;;
+	*)  
+	    usage
+	    die "Unrecognized option:" $1
+	esac
+	shift
+    done
+    # ---------------------------------------
+    # Check parameters
+    if [[ ! ${SCHEMA_VERSION} ]] ; then
+      die "Please specify a schema version with -s."
+    fi
+    if [[ ! ${RELEASE_VERSION} ]] ; then
+      die "Please specify a release version with -R."
+    fi
+}
+
+
+function doParts {
+    # args: cmdAbbrev; fileType; script; schemaFile; grepPattern; allianceFileType
+    doPart "d" "diseaseAnnotations.py" "disease_annotation" "CURATION-DAF"
+}
+
+function main {
+    #
+    parseCommandLine $*
+    #
+    ODIR="${OUTPUT_DIR}/MGI_ps_${RELEASE_VERSION}"
+    if [[ ${RELEASE_COUNT} ]] ; then
+	ODIR="${ODIR}_${RELEASE_COUNT}"
+    fi
+    ROOT="${ODIR}/MGI_ps_${RELEASE_VERSION}"
+
+    # ---------------------------------------
+    logit
+    logit "This is the Alliance Persistent Store datafeed pipeline. Starting run..."
+
+    # ---------------------------------------
+    #
+    logit "mkdir -p ${ODIR}"
+    mkdir -p ${ODIR}
+    checkexit
+
+    if [[ ${LOGFILE} ]]; then
+        doParts >>${LOGFILE} 2>1
+    else
+        doParts
+    fi
+
+    logit "Finished."
+}
+
+main $*
