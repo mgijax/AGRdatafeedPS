@@ -250,7 +250,7 @@ function main {
     checkexit
 
     if [[ ${LOGFILE} ]]; then
-        doParts >>${LOGFILE} 2>1
+        doParts >>${LOGFILE} 2>&1
     else
         doParts
     fi
