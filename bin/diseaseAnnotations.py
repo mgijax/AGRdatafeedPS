@@ -1,6 +1,7 @@
 
 import db
 import json
+import re
 
 def getDiseaseAnnotations (cfg) :
     q = '''
@@ -34,9 +35,11 @@ def getDiseaseAnnotations (cfg) :
         AND ag._object_key = gg._genotype_key
         AND ag._mgitype_key                      = %(_mgitype_key)d
         AND ag._logicaldb_key = 1
+        AND ag.preferred = 1
         AND av._object_key = vt._term_key
         AND av._mgitype_key = 13
         AND av._logicaldb_key = 191
+        AND av.preferred = 1
         AND va._annot_key = ve._annot_key
         AND ve._refs_key = ra._object_key
         AND ra._mgitype_key = 1
@@ -65,20 +68,29 @@ def getPrivateCuratorNotes (cfg) :
         ek2note[r['_object_key']] = r['note']
     return ek2note
 
+def formatDate (s) :
+    s = re.sub('\.[0-9]*$', '', s)
+    s = s.replace(" ", "T")
+    s = s + "Z"
+    return s
+
 def getJsonObject (cfg, r, ek2note) :
+    unique_id = "MGI:diseaseannotation_%s_%s" % (r['_annot_key'], r['_annotevidence_key'])
     obj = {
+      "mod_entity_id" : unique_id,
+      "internal": False,
       "evidence_codes": [ "ECO:0000033" ],  # all disease annots use traceable author statement (TAS) codes
       "annotation_type" : "manually_curated",
       "single_reference": "PMID:"+r["pmid"] if r["pmid"] else r["mgipubid"],
       "data_provider": "MGI",  
       "object": r["doid"],
       "created_by": "MGI:curation_staff",
-      "modified_by": "MGI:curation_staff",
+      "updated_by": "MGI:curation_staff",
       "subject": r["genoid"],
       "predicate": cfg["predicate"],
       "negated" : r["qualifier"] == "NOT",
-      "creation_date" : r["creation_date"],
-      "date_last_modified" : r["modification_date"]
+      "date_created" : formatDate(r["creation_date"]),
+      "date_updated" : formatDate(r["modification_date"])
     }
     if r['_annotevidence_key'] in ek2note:
         obj['related_notes'] = [{
