@@ -7,10 +7,6 @@ checkexit
 
 cd ${AGR_CURATION_SCHEMA}
 
-logit "Checkout out ${SCHEMA_VERSION}"
-git checkout ${SCHEMA_VERSION}
-checkexit
-
 rm -fr venv
 
 logit "Creating virtual environment."

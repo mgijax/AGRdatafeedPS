@@ -3,6 +3,9 @@ import db
 import json
 import re
 
+APPROVED_ALLELE_STATUS = 847114
+AUTOLOAD_ALLELE_STATUS = 3983021
+
 def getAlleles () :
     q = '''
         SELECT
@@ -10,20 +13,13 @@ def getAlleles () :
         FROM
             ALL_Allele a,
             ACC_Accession aa
-        WHERE
-            a._marker_key in (
-                select _marker_key
-                from mrk_marker
-                where _organism_key = 1
-                and _marker_type_key = 1
-                and _marker_status_key = 1
-                )
+        WHERE a._allele_status_key in (%d,%d)
             and a._allele_key = aa._object_key
             and aa._mgitype_key = 11
             and aa._logicaldb_key = 1
             and aa.preferred = 1
             and aa.private = 0
-        '''
+        ''' % (APPROVED_ALLELE_STATUS, AUTOLOAD_ALLELE_STATUS)
     return db.sql(q, 'auto')
 
 def getJsonObject (r) :
