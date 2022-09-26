@@ -27,7 +27,6 @@ Usage: $0 [-d output_directory][-p d][-g][-v dir][-u file]
 
 Installation settings:
     RELEASE_VERSION=${RELEASE_VERSION}
-    SCHEMA_VERSION=${SCHEMA_VERSION}
 	
 Options:
 -h	Print this message and exit.
@@ -39,11 +38,15 @@ Options:
 	Default = current working directory.
 -p pts	Specify which part(s) to run. Argument is a comma-separated list (no spaces) of any of the following:
 	d	Disease annotations
+        g       Genes (and other features)
+        a       Alleles
+        y       Genotypes (AGRs)
+
 	If no -p option is provided, all parts are run.
 
 You need to specify at least one of the following options to actually do anything:
 -g      Generate data files specified in -p option.
--v dir	Validate data files specified in -p option. Argument = directory where validator is installed.
+-v 	Validate data files specified in -p option. 
 -u file Upload files specified in -p option to the Alliance submission endpoint. 
 	Argument is the file containing the DQM access token.
 
@@ -103,26 +106,36 @@ function validate {
   #
   # ASSUMES the validor is checked out to the correct schema version!
   #
-  source 
-  ${PYTHON2} /util/agr_validate.py -i ${FILE}
+  pushd ${VALIDATOR_DIR}
+  source ./venv/bin/activate
+  python ./util/validate_agr_schema.py -i ${FILE}
   checkexit 
   logit "Validated: ${FILE}"
+  deactivate
+  popd
 }
 # ---------------------
+# See: https://github.com/alliance-genome/agr_curation#submitting-data
+# See: https://${curation_system}.alliancegenome.org/api/version
 function upload {
   ftype=$1
   aftype=$2
-  setFile ${ftype}
-  logit "Uploading file to AGR: ${RELEASE_VERSION}_${aftype}_MGI=@${FILE} ..."
+  curation_system="curation" # also: alpha-curation, beta-curation
+  url="https://${curation_system}.alliancegenome.org/api/data/submit"
   token=`cat ${TOKEN_FILE}`
+  setFile ${ftype}
+  command="curl \
+    -H \"Authorization: Bearer ${token}\" \
+    -X POST \"${url}\" \
+    -F \"${aftype}_MGI=@${FILE}\""
+  logit "Uploading file with command: ${command}"
   if [[ ${NO_RUN} ]] ; then
     return
   fi
-#curl -H "Authorization: Bearer ${TOKEN}" -X POST "https://fms.alliancegenome.org/api/data/submit" -F "5.1.1_CURATION-DAF_MGI=@MGI_ps_disease_annotation.json"
   curl \
       -H "Authorization: Bearer ${token}" \
       -X POST "https://fms.alliancegenome.org/api/data/submit" \
-      -F "${RELEASE_VERSION}_${aftype}_MGI=@${FILE}"
+      -F "${aftype}_MGI=@${FILE}"
   checkexit
   logit "Uploaded: ${FILE}"
 }
@@ -182,10 +195,6 @@ function parseCommandLine {
 	    shift
 	    OUTPUT_DIR="$1"
 	    ;;  
-	-s) 
-	    shift
-	    SCHEMA_VERSION="$1"
-	    ;;  
 	-R) 
 	    shift
 	    RELEASE_VERSION="$1"
@@ -205,9 +214,6 @@ function parseCommandLine {
     done
     # ---------------------------------------
     # Check parameters
-    if [[ ! ${SCHEMA_VERSION} ]] ; then
-      die "Please specify a schema version with -s."
-    fi
     if [[ ! ${RELEASE_VERSION} ]] ; then
       die "Please specify a release version with -R."
     fi
@@ -216,7 +222,10 @@ function parseCommandLine {
 
 function doParts {
     # args: cmdAbbrev; fileType; script; schemaFile; grepPattern; allianceFileType
-    doPart "d" "diseaseAnnotations.py" "disease_annotation" "CURATION-DAF"
+    doPart "g" "genes.py"   "gene"   "GENE"
+    doPart "a" "alleles.py" "allele" "ALLELE"
+    doPart "y" "agms.py"    "agm"    "AGM"
+    doPart "d" "diseaseAnnotations.py" "disease_annotation" "DISEASE_ANNOTATION"
 }
 
 function main {
@@ -227,11 +236,12 @@ function main {
     if [[ ${RELEASE_COUNT} ]] ; then
 	ODIR="${ODIR}_${RELEASE_COUNT}"
     fi
-    ROOT="${ODIR}/MGI_ps_${RELEASE_VERSION}"
+    ROOT="${ODIR}/MGI_ps"
 
     # ---------------------------------------
     logit
     logit "This is the Alliance Persistent Store datafeed pipeline. Starting run..."
+    logit "Reading from ${PG_DBSERVER}.${PG_DBNAME}"
 
     # ---------------------------------------
     #
