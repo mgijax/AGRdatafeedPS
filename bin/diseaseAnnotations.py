@@ -48,6 +48,52 @@ def getDiseaseAnnotations (cfg) :
         ''' % cfg
     return db.sql(q, 'auto')
 
+def getRollups ():
+    # builds a map from annotation key to inferred gene and/or allele ids.
+    annotKey2inferred = {}
+    #
+    cfgs = [{
+        '_annottype_key' : 1023,
+        '_mgitype_key' : 2,
+        'name' : 'inferred_gene'
+    },{
+        '_annottype_key' : 1029,
+        '_mgitype_key' : 11,
+        'name' : 'inferred_allele'
+    }]
+    #
+    q = '''
+        select 
+          va._object_key,
+          a1.accid,
+          cast(vep.value as integer) as _annot_key
+        from
+          voc_annot va,
+          voc_evidence ve,
+          voc_evidence_property vep,
+          voc_term vept,
+          acc_accession a1
+        where va._annot_key = ve._annot_key
+        and ve._annotevidence_key = vep._annotevidence_key
+        and vep._propertyterm_key = vept._term_key
+        and vept.term = '_SourceAnnot_key'
+        and va._annottype_key = %(_annottype_key)d
+        and a1._object_key = va._object_key
+        and a1._mgitype_key = %(_mgitype_key)d
+        and a1._logicaldb_key = 1
+        and a1.preferred = 1
+        '''
+    #
+    for cfg in cfgs:
+        name = cfg['name']
+        for r in db.sql(q % cfg, 'auto'):
+            ak = r['_annot_key']
+            mgiid = r['accid']
+            annotKey2inferred.setdefault(ak, {})[name] = mgiid
+    #
+    return annotKey2inferred
+            
+
 def getPrivateCuratorNotes (cfg) :
     q = '''
         SELECT
@@ -74,7 +120,7 @@ def formatDate (s) :
     s = s + "Z"
     return s
 
-def getJsonObject (cfg, r, ek2note) :
+def getJsonObject (cfg, r, ek2note, annotKey2inferred) :
     unique_id = "MGI:diseaseannotation_%s_%s" % (r['_annot_key'], r['_annotevidence_key'])
     obj = {
       "mod_entity_id" : unique_id,
@@ -92,15 +138,26 @@ def getJsonObject (cfg, r, ek2note) :
       "date_created" : formatDate(r["creation_date"]),
       "date_updated" : formatDate(r["modification_date"])
     }
+    #
     if r['_annotevidence_key'] in ek2note:
         obj['related_notes'] = [{
                 'free_text' : ek2note[r['_annotevidence_key']],
                 'internal'  : True,
                 'note_type' : 'disease_note'
             }]
+    #
+    inferred = annotKey2inferred.get(r['_annot_key'], {})
+    igene = inferred.get('inferred_gene', None)
+    iallele = inferred.get('inferred_allele', None)
+    if igene:
+        obj['inferred_gene'] = igene
+    if iallele:
+        obj['inferred_allele'] = iallele
+    #
     return obj
 
 def main () :
+    annotKey2inferred = getRollups()
     cfg = {
         "disease_agm_ingest_set": {
             "_annottype_key" : 1020,
@@ -121,7 +178,7 @@ def main () :
         print('"%s": [' % section)
         for j,r in enumerate(getDiseaseAnnotations(scfg)):
             if j: print(',', end='')
-            o = getJsonObject(scfg, r, ek2note)
+            o = getJsonObject(scfg, r, ek2note, annotKey2inferred)
             print(json.dumps(o))
         print(']')
     print('}')
