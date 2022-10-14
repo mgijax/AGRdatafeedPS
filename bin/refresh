@@ -134,7 +134,7 @@ function upload {
   fi
   curl \
       -H "Authorization: Bearer ${token}" \
-      -X POST "https://fms.alliancegenome.org/api/data/submit" \
+      -X POST "${url}" \
       -F "${aftype}_MGI=@${FILE}"
   checkexit
   logit "Uploaded: ${FILE}"
