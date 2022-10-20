@@ -2,6 +2,7 @@
 import db
 import json
 import re
+from adfLib import symbolToHtml
 
 APPROVED_ALLELE_STATUS = 847114
 AUTOLOAD_ALLELE_STATUS = 3983021
@@ -27,7 +28,7 @@ def getJsonObject (r) :
         "curie" : r["accid"],
         "taxon": "NCBITaxon:10090",
         "internal": False,
-        "symbol" : r["symbol"],
+        "symbol" : symbolToHtml(r["symbol"]),
         "name" : r["name"],
     }
     return obj
@@ -42,4 +43,5 @@ def main () :
     print(']')
     print('}')
 
-main()
+if __name__ == "__main__":
+    main()
