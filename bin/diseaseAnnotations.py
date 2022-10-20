@@ -2,6 +2,7 @@
 import db
 import json
 import re
+from genes import getGenes
 
 def getDiseaseAnnotations (cfg) :
     q = '''
@@ -48,18 +49,33 @@ def getDiseaseAnnotations (cfg) :
         ''' % cfg
     return db.sql(q, 'auto')
 
+# When we set inferred_gene, want to only include ids for things we actually submitted.
+# This function imports/uses the query from genes.py to get this set.
+def getSubmittedGeneIds ():
+    ids = set()
+    for g in getGenes():
+        ids.add(g['accid'])
+    return ids
+
+# Returns a mapping from _annot_key to inferred_allele/inferred_gene.
+# The query works by seeing if an _annot_key matches a back-reference for
+# a derived annotation. If so, the derived annotation's gene or allele is
+# the inferred_gene/inferred_allele for the _annot_key.
 def getRollups ():
     # builds a map from annotation key to inferred gene and/or allele ids.
+
     annotKey2inferred = {}
     #
+    # The query runs once for derived gene annotations and once for
+    # derived allele annotations.
     cfgs = [{
         '_annottype_key' : 1023,
         '_mgitype_key' : 2,
-        'name' : 'inferred_gene'
+        'fieldname' : 'inferred_gene'
     },{
         '_annottype_key' : 1029,
         '_mgitype_key' : 11,
-        'name' : 'inferred_allele'
+        'fieldname' : 'inferred_allele'
     }]
     #
     q = '''
@@ -85,11 +101,11 @@ def getRollups ():
         '''
     #
     for cfg in cfgs:
-        name = cfg['name']
+        fieldname = cfg['fieldname']
         for r in db.sql(q % cfg, 'auto'):
             ak = r['_annot_key']
             mgiid = r['accid']
-            annotKey2inferred.setdefault(ak, {})[name] = mgiid
+            annotKey2inferred.setdefault(ak, {})[fieldname] = mgiid
     #
     return annotKey2inferred
             
@@ -120,7 +136,7 @@ def formatDate (s) :
     s = s + "Z"
     return s
 
-def getJsonObject (cfg, r, ek2note, annotKey2inferred) :
+def getJsonObject (cfg, r, ek2note, annotKey2inferred, submittedGeneIds) :
     unique_id = "MGI:diseaseannotation_%s_%s" % (r['_annot_key'], r['_annotevidence_key'])
     obj = {
       "mod_entity_id" : unique_id,
@@ -149,7 +165,7 @@ def getJsonObject (cfg, r, ek2note, annotKey2inferred) :
     inferred = annotKey2inferred.get(r['_annot_key'], {})
     igene = inferred.get('inferred_gene', None)
     iallele = inferred.get('inferred_allele', None)
-    if igene:
+    if igene and igene in submittedGeneIds:
         obj['inferred_gene'] = igene
     if iallele:
         obj['inferred_allele'] = iallele
@@ -157,6 +173,7 @@ def getJsonObject (cfg, r, ek2note, annotKey2inferred) :
     return obj
 
 def main () :
+    submittedGeneIds = getSubmittedGeneIds()
     annotKey2inferred = getRollups()
     cfg = {
         "disease_agm_ingest_set": {
@@ -178,9 +195,10 @@ def main () :
         print('"%s": [' % section)
         for j,r in enumerate(getDiseaseAnnotations(scfg)):
             if j: print(',', end='')
-            o = getJsonObject(scfg, r, ek2note, annotKey2inferred)
+            o = getJsonObject(scfg, r, ek2note, annotKey2inferred, submittedGeneIds)
             print(json.dumps(o))
         print(']')
     print('}')
 
-main()
+if __name__ == "__main__":
+    main()
