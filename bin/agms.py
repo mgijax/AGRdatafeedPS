@@ -42,7 +42,7 @@ def getJsonObject (r, agmKey2name) :
     
     obj = {
         "curie" : r["accid"],
-        "name" : (agmKey2name.get(r["_genotype_key"], "") + " [background:] " + r["strain"]).strip(),
+        "name" : (agmKey2name.get(r["_genotype_key"], "") + " [background:] " + symbolToHtml(r["strain"])).strip(),
         "taxon": "NCBITaxon:10090",
         "internal": False,
         "subtype" : "genotype",
