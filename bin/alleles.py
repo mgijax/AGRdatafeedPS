@@ -2,7 +2,7 @@
 import db
 import json
 import re
-from adfLib import symbolToHtml, indexResults
+from adfLib import LINKML_VERSION, symbolToHtml, indexResults
 
 APPROVED_ALLELE_STATUS = 847114
 AUTOLOAD_ALLELE_STATUS = 3983021
@@ -62,19 +62,35 @@ def getJsonObject (r, ak2refs) :
     refs.sort()
     obj = {
         "curie" : r["accid"],
-        "taxon": "NCBITaxon:10090",
+        "taxon_curie": "NCBITaxon:10090",
         "internal": False,
-        "symbol" : symbolToHtml(r["symbol"]),
-        "name" : r["name"],
-        "inheritance_mode" : r["mode"].lower(),
-        "in_collection" : r["collection"],
+        "allele_symbol_dto" : {
+	    "name_type_name" : "nomenclature_symbol",
+	    "format_text" : symbolToHtml(r["symbol"]),
+	    "display_text" : symbolToHtml(r["symbol"]),
+	    "internal" : False,
+	},
+        "allele_full_name_dto" : {
+	    "name_type_name" : "full_name",
+	    "format_text" : r["name"],
+	    "display_text" : r["name"],
+	    "internal" : False
+	},
+	"allele_inheritance_mode_dtos": [{
+          "inheritance_mode_name": r["mode"].lower(),
+          "internal": False
+        }],
         "is_extinct" : (r["isextinct"] == 1),
-        "references" : refs
+        "reference_curies" : refs
     }
+    collName = r["collection"].replace(" ","_")
+    if collName:
+    	obj["in_collection_name"] = collName
     return obj
 
 def main () :
     print('{')
+    print(LINKML_VERSION)
     print('"allele_ingest_set": [')
     ak2refs = getAlleleRefs()
     for j,r in enumerate(getAlleles()):

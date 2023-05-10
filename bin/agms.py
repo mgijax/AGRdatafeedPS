@@ -2,7 +2,7 @@
 import db
 import json
 import re
-from adfLib import symbolToHtml
+from adfLib import LINKML_VERSION, symbolToHtml
 
 def getAGMnames () :
     q = '''
@@ -43,15 +43,16 @@ def getJsonObject (r, agmKey2name) :
     obj = {
         "curie" : r["accid"],
         "name" : (agmKey2name.get(r["_genotype_key"], "") + " [background:] " + symbolToHtml(r["strain"])).strip(),
-        "taxon": "NCBITaxon:10090",
+        "taxon_curie": "NCBITaxon:10090",
         "internal": False,
-        "subtype" : "genotype",
+        "subtype_name" : "genotype",
     }
     return obj
 
 def main () :
     agmKey2name = getAGMnames()
     print('{')
+    print(LINKML_VERSION)
     print('"agm_ingest_set": [')
     for j,r in enumerate(getAGMs()):
         if j: print(',', end='')

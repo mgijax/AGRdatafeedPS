@@ -3,6 +3,7 @@ import db
 import json
 import re
 from genes import getGenes
+from adfLib import LINKML_VERSION, symbolToHtml
 
 def getDiseaseAnnotations (cfg) :
     q = '''
@@ -12,7 +13,7 @@ def getDiseaseAnnotations (cfg) :
             av.accid AS doid,
             vt.term AS doterm,
             qt.term AS qualifier,
-            ag.accid AS genoid,
+            ag.accid AS subjectid,
             ra.accid AS mgipubid,
             pma.accid as pmid,
             ve.creation_date,
@@ -139,36 +140,47 @@ def formatDate (s) :
 def getJsonObject (cfg, r, ek2note, annotKey2inferred, submittedGeneIds) :
     unique_id = "MGI:diseaseannotation_%s_%s" % (r['_annot_key'], r['_annotevidence_key'])
     obj = {
-      "mod_entity_id" : unique_id,
+      #"mod_entity_id" : unique_id,
       "internal": False,
-      "evidence_codes": [ "ECO:0000033" ],  # all disease annots use traceable author statement (TAS) codes
-      "annotation_type" : "manually_curated",
-      "single_reference": "PMID:"+r["pmid"] if r["pmid"] else r["mgipubid"],
-      "data_provider": "MGI",  
-      "object": r["doid"],
-      "created_by": "MGI:curation_staff",
-      "updated_by": "MGI:curation_staff",
-      "subject": r["genoid"],
-      "predicate": cfg["predicate"],
+      "evidence_code_curies": [ "ECO:0000033" ],  # all disease annots use TAS
+      "annotation_type_name" : "manually_curated",
+      "reference_curie": "PMID:"+r["pmid"] if r["pmid"] else r["mgipubid"],
+      "data_provider_dto": {
+      	"source_organization_abbreviation": "MGI",  
+	"internal" : False,
+        "cross_reference_dto": {
+          "referenced_curie": r["doid"],
+          "prefix": "DOID",
+          "page_area": "disease/mgi",
+          "display_name": r["doid"],
+          "internal": False
+        }  
+      },
+      "do_term_curie": r["doid"],
+      "created_by_curie": "MGI:curation_staff",
+      "updated_by_curie": "MGI:curation_staff",
+      "disease_relation_name": cfg["predicate"],
       "negated" : r["qualifier"] == "NOT",
       "date_created" : formatDate(r["creation_date"]),
       "date_updated" : formatDate(r["modification_date"])
     }
     #
+    obj[cfg["curie_field"]] = r["subjectid"]
+    #
     if r['_annotevidence_key'] in ek2note:
-        obj['related_notes'] = [{
+        obj['note_dtos'] = [{
                 'free_text' : ek2note[r['_annotevidence_key']],
                 'internal'  : True,
-                'note_type' : 'disease_note'
+                'note_type_name' : 'disease_note'
             }]
     #
     inferred = annotKey2inferred.get(r['_annot_key'], {})
     igene = inferred.get('inferred_gene', None)
     iallele = inferred.get('inferred_allele', None)
     if igene and igene in submittedGeneIds:
-        obj['inferred_gene'] = igene
+        obj['inferred_gene_curie'] = igene
     if iallele:
-        obj['inferred_allele'] = iallele
+        obj['inferred_allele_curie'] = iallele
     #
     return obj
 
@@ -179,16 +191,19 @@ def main () :
         "disease_agm_ingest_set": {
             "_annottype_key" : 1020,
             "_mgitype_key"   : 12,
-            "predicate"      : "is_model_of"
+            "predicate"      : "is_model_of",
+	    "curie_field"    : "agm_curie"
         },
         "disease_allele_ingest_set": {
             "_annottype_key" : 1021,
             "_mgitype_key"   : 11,
-            "predicate"      : "is_implicated_in"
+            "predicate"      : "is_implicated_in",
+	    "curie_field"    : "allele_curie"
         }
     }
 
     print('{')
+    print(LINKML_VERSION)
     for i, (section, scfg) in enumerate(cfg.items()):
         ek2note = getPrivateCuratorNotes(scfg)
         if i: print(',', end='')

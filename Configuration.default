@@ -8,8 +8,7 @@ source ${MGICONFIG}/master.config.sh
 
 export AGR_CURATION_SCHEMA="agr_curation_schema"
 export AGR_CURATION_SCHEMA_URL="https://github.com/alliance-genome/agr_curation_schema"
-
-export RELEASE_VERSION="default"
+export AGR_CURATION_SCHEMA_VERSION="1.6.0"
 
 # ---------------------
 # Echos its arguments to the log file. Prepends a datetime stamp.

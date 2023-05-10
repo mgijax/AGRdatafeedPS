@@ -1,12 +1,20 @@
 
 source Configuration
 
+logit "Removing old curation schema installation: ${AGR_CURATION_SCHEMA}"
+rm -fr ${AGR_CURATION_SCHEMA}
+
 logit "Cloning ${AGR_CURATION_SCHEMA} from ${AGR_CURATION_SCHEMA_URL}"
 git clone "${AGR_CURATION_SCHEMA_URL}"
 checkexit
 
-cd ${AGR_CURATION_SCHEMA}
+pushd ${AGR_CURATION_SCHEMA}
+git checkout "v${AGR_CURATION_SCHEMA_VERSION}"
+checkexit
 
+popd
+
+cd bin
 rm -fr venv
 
 logit "Creating virtual environment."
@@ -16,16 +24,7 @@ checkexit
 source venv/bin/activate
 export PYTHONPATH=.:$PYTHONPATH
 
-logit "Upgrading pip."
-pip install --upgrade pip
-checkexit
-
-logit "Installing pipenv"
-pip install pipenv
-checkexit
-
-logit "pip install -e ."
-pip install -e .
-checkexit 
+logit "Installing jsonschema"
+pip install jsonschema
 
 deactivate

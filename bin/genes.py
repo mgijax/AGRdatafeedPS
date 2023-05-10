@@ -2,6 +2,7 @@
 import db
 import json
 import re
+from adfLib import LINKML_VERSION, symbolToHtml
 
 def getGenes () :
     q = '''
@@ -25,15 +26,26 @@ def getGenes () :
 def getJsonObject (r) :
     obj = {
         "curie" : r["accid"],
-        "taxon": "NCBITaxon:10090",
+        "taxon_curie": "NCBITaxon:10090",
         "internal": False,
-        "symbol" : r["symbol"],
-        "name" : r["name"],
+        "gene_symbol_dto" : {
+	    "name_type_name" : "nomenclature_symbol",
+	    "format_text" : r["symbol"],
+	    "display_text" : r["symbol"],
+	    "internal" : False,
+	    },
+        "gene_full_name_dto" : {
+	    "name_type_name" : "full_name",
+	    "format_text" : r["name"],
+	    "display_text" : r["name"],
+	    "internal" : False
+	}
     }
     return obj
 
 def main () :
     print('{')
+    print(LINKML_VERSION)
     print('"gene_ingest_set": [')
     for j,r in enumerate(getGenes()):
         if j: print(',', end='')
