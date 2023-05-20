@@ -13,6 +13,7 @@ LOGFILE=""
 OUTPUT_DIR="."
 RELEASE_COUNT=""
 DO_ALL="true"
+DO_SAMPLE=""
 VALIDATOR_DIR="../agr_curation_schema"
 DO_GENERATE=""
 DO_VALIDATE=""
@@ -173,6 +174,10 @@ function parseCommandLine {
 	    shift
 	    LOGFILE="$1"
 	    ;;
+        -s)
+            DO_SAMPLE="true"
+            export DO_SAMPLE
+            ;;
 	-g)
 	    DO_GENERATE="true"
 	    ;;

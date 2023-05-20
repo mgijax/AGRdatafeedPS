@@ -3,7 +3,7 @@ import db
 import json
 import re
 from genes import getGenes
-from adfLib import LINKML_VERSION, symbolToHtml
+from adfLib import LINKML_VERSION, symbolToHtml, getDataProviderDto, mainQuery
 
 def getDiseaseAnnotations (cfg) :
     q = '''
@@ -145,17 +145,7 @@ def getJsonObject (cfg, r, ek2note, annotKey2inferred, submittedGeneIds) :
       "evidence_code_curies": [ "ECO:0000033" ],  # all disease annots use TAS
       "annotation_type_name" : "manually_curated",
       "reference_curie": "PMID:"+r["pmid"] if r["pmid"] else r["mgipubid"],
-      "data_provider_dto": {
-      	"source_organization_abbreviation": "MGI",  
-	"internal" : False,
-        "cross_reference_dto": {
-          "referenced_curie": r["doid"],
-          "prefix": "DOID",
-          "page_area": "disease/mgi",
-          "display_name": r["doid"],
-          "internal": False
-        }  
-      },
+      "data_provider_dto": getDataProviderDto(r["doid"], "disease"),
       "do_term_curie": r["doid"],
       "created_by_curie": "MGI:curation_staff",
       "updated_by_curie": "MGI:curation_staff",
@@ -208,7 +198,7 @@ def main () :
         ek2note = getPrivateCuratorNotes(scfg)
         if i: print(',', end='')
         print('"%s": [' % section)
-        for j,r in enumerate(getDiseaseAnnotations(scfg)):
+        for j,r in mainQuery(getDiseaseAnnotations(scfg)):
             if j: print(',', end='')
             o = getJsonObject(scfg, r, ek2note, annotKey2inferred, submittedGeneIds)
             print(json.dumps(o))

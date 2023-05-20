@@ -2,7 +2,7 @@
 import db
 import json
 import re
-from adfLib import LINKML_VERSION, symbolToHtml
+from adfLib import LINKML_VERSION, symbolToHtml, getDataProviderDto, mainQuery
 
 def getGenes () :
     q = '''
@@ -26,18 +26,21 @@ def getGenes () :
 def getJsonObject (r) :
     obj = {
         "curie" : r["accid"],
+        "data_provider_dto": getDataProviderDto(r["accid"], "gene"),
         "taxon_curie": "NCBITaxon:10090",
+        "created_by_curie": "MGI",
+        "updated_by_curie": "MGI",
         "internal": False,
         "gene_symbol_dto" : {
 	    "name_type_name" : "nomenclature_symbol",
-	    "format_text" : r["symbol"],
-	    "display_text" : r["symbol"],
+	    "format_text" : symbolToHtml(r["symbol"]),
+	    "display_text" : symbolToHtml(r["symbol"]),
 	    "internal" : False,
 	    },
         "gene_full_name_dto" : {
 	    "name_type_name" : "full_name",
-	    "format_text" : r["name"],
-	    "display_text" : r["name"],
+	    "format_text" : symbolToHtml(r["name"]),
+	    "display_text" : symbolToHtml(r["name"]),
 	    "internal" : False
 	}
     }
@@ -47,7 +50,7 @@ def main () :
     print('{')
     print(LINKML_VERSION)
     print('"gene_ingest_set": [')
-    for j,r in enumerate(getGenes()):
+    for j,r in mainQuery(getGenes()):
         if j: print(',', end='')
         o = getJsonObject(r)
         print(json.dumps(o))
