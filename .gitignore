@@ -1,0 +1,25 @@
+# Untracked files:
+#   (use "git add <file>..." to include in what will be committed)
+#
+#       Configuration
+#       agr_curation_schema/
+#       bin/1.5.0/
+#       bin/1.6.0/
+#       bin/1.6.0_22/
+#       bin/1.7.0/
+#       bin/1.7.0_22/
+#       bin/1.7.0_23/
+#       bin/1.7.3/
+#       bin/__pycache__/
+#       bin/nohup.out
+#       bin/tmp/
+#       bin/venv/
+#       output/
+#       test.sh
+
+Configuration
+agr_curation_schema
+nohup.out
+__pycache__
+bin/[0-9]*
+bin/venv
