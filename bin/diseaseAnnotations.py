@@ -140,12 +140,12 @@ def formatDate (s) :
 def getJsonObject (cfg, r, ek2note, annotKey2inferred, submittedGeneIds) :
     unique_id = "MGI:diseaseannotation_%s_%s" % (r['_annot_key'], r['_annotevidence_key'])
     obj = {
-      #"mod_entity_id" : unique_id,
+      "mod_internal_id" : unique_id,
       "internal": False,
       "evidence_code_curies": [ "ECO:0000033" ],  # all disease annots use TAS
       "annotation_type_name" : "manually_curated",
       "reference_curie": "PMID:"+r["pmid"] if r["pmid"] else r["mgipubid"],
-      "data_provider_dto": getDataProviderDto(r["doid"], "disease"),
+      "data_provider_dto": getDataProviderDto(r["subjectid"], cfg["subjecttype"]),
       "do_term_curie": r["doid"],
       "created_by_curie": "MGI:curation_staff",
       "updated_by_curie": "MGI:curation_staff",
@@ -182,13 +182,15 @@ def main () :
             "_annottype_key" : 1020,
             "_mgitype_key"   : 12,
             "predicate"      : "is_model_of",
-	    "curie_field"    : "agm_curie"
+	    "curie_field"    : "agm_curie",
+            "subjecttype"    : "genotype",
         },
         "disease_allele_ingest_set": {
             "_annottype_key" : 1021,
             "_mgitype_key"   : 11,
             "predicate"      : "is_implicated_in",
-	    "curie_field"    : "allele_curie"
+	    "curie_field"    : "allele_curie",
+            "subjecttype"    : "allele",
         }
     }
 
