@@ -73,26 +73,7 @@ def getAlleleAttributes () :
         WHERE va._annottype_key = 1014
         AND va._term_key = vt._term_key
         '''
-    return indexResults(db.sql(q), '_allele_key', 'term', multi=True, mapper=lambda s: s.lower())
-
-mutation2soid = dict([
-    ("Intergenic deletion",     "SO:0000159"),
-    ("Intragenic deletion",     "SO:0000159"),
-    ("Duplication",     "SO:1000035"),
-    ("Insertion",       "SO:0000667"),
-    ("Insertion of gene trap vector",   "SO:0001218"),
-    ("Viral insertion", "SO:0000667"),
-    ("Transposon insertion",    "SO:0001837"),
-    ("Inversion",       "SO:1000036"),
-    ("Nucleotide substitutions",        "SO:0002007"),
-    ("Single point mutation",   "SO:1000008"),
-    ("Translocation",   "SO:0000199"),
-    ("Nucleotide repeat expansion",     "SO:0002162"),
-    ("Not Applicable",  None),
-    ("Not Specified",   None),
-    ("Other",   None),
-    ("Undefined",       None),
-    ])
+    return indexResults(db.sql(q), '_allele_key', 'term', multi=True)
 
 def getAlleleMutations () :
     q = '''
@@ -100,7 +81,7 @@ def getAlleleMutations () :
         FROM all_allele_mutation m, voc_term t
         WHERE m._mutation_key = t._term_key
         '''
-    return indexResults(db.sql(q), '_allele_key', 'term', multi=True, mapper = lambda s: mutation2soid.get(s, None))
+    return indexResults(db.sql(q), '_allele_key', 'term', multi=True, mapper = lambda s: MUTATION_2_SOID.get(s, None))
 
 def getAlleleSecondaryIds () :
     q = '''
@@ -130,7 +111,10 @@ def getAlleles () :
               ELSE c.term
             END as collection,
             a.isextinct,
-            st.term as status
+            CASE
+              WHEN st.term = 'Autoload' THEN 'autoloaded'
+              ELSE st.term
+            END as status
         FROM
             ALL_Allele a,
             ACC_Accession aa,
@@ -148,13 +132,6 @@ def getAlleles () :
             and a._allele_status_key = st._term_key
         ''' % (APPROVED_ALLELE_STATUS, AUTOLOAD_ALLELE_STATUS)
     return db.sql(q, 'auto')
-
-inheritanceModes = {
-    "Codominant" : "codominant",
-    "Semidominant" : "semi-dominant",
-    "Recessive" : "recessive",
-    "Dominant" : "dominant",
-}
 
 def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) :
     refs = ak2refs.get(r["_allele_key"], [])
@@ -182,7 +159,7 @@ def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) 
         "reference_curies" : allrefids
     }
     # inheritance mode
-    mode = inheritanceModes.get(r["mode"], None)
+    mode = INHERITANCE_MODE.get(r["mode"], None)
     if mode:
         dto = {
           "inheritance_mode_name": mode,
@@ -195,11 +172,9 @@ def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) 
     	obj["in_collection_name"] = collName
     # transmission status
     trans = ak2trans.get(r["_allele_key"], None)
-    if trans not in [None, 'not applicable']:
-        if trans == "not specified":
-            trans = "unknown"
+    if trans not in [None, 'not applicable', 'not specified']:
         dto = {
-            "germline_transmission_status_name": trans,
+            "germline_transmission_status_name": GERMLINE_TRANS[trans],
             "internal": False
         }
         transRefs = list(filter(lambda r: r["_refassoctype_key"] == 1023, refs))
@@ -229,8 +204,9 @@ def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) 
         "internal": False
     }
     # allele attributes (annotation type 1014)
-    attrs = ak2attrs.get(r["_allele_key"], None)
-    if attrs:
+    attrs = ak2attrs.get(r["_allele_key"], [])
+    attrs = list(filter(lambda x:x, map(lambda a: FUNC_IMPACT[a], attrs)))
+    if len(attrs):
         dto = {
             "functional_impact_names" : attrs,
             "internal" : False
@@ -275,6 +251,67 @@ def main () :
         print(json.dumps(o))
     print(']')
     print('}')
+
+######
+# Translation tables 
+######
+
+FUNC_IMPACT = dict([
+        ("Dominant negative", "dominant_negative_(antimorphic)"),
+        ("Constitutively active", "constitutively_active"),
+        ("Hypomorph", "hypomorphic_(reduction_of_function)"),
+        ("Knockdown", "knockdown"),
+        ("Null/knockout", "amorphic_(null/knockout)"),
+        ("Not Specified", ""),
+        ("Inducible", "inducible"),
+        ("Inserted expressed sequence", "inserted_expressed_sequence"),
+        ("Modified isoform(s)", "modified_isoform(s)"),
+        ("No functional change", "no_functional_change"),
+        ("Recombinase", "recombinase"),
+        ("Reporter", "reporter"),
+        ("RMCE-ready", "RMCE-ready"),
+        ("Transactivator", "transactivator"),
+        ("Transposase", "transposase"),
+        ("Transposon concatemer", "transposon_concatemer"),
+        ("Epitope tag", "epitope_tag"),
+        ("Endonuclease", "endonuclease"),
+        ("Modified regulatory region", "modified_regulatory_region"),
+        ("Not Applicable", ""),
+        ("Conditional ready", "conditional_ready"),
+        ("Humanized sequence", "humanized_sequence"),
+    ])
+
+GERMLINE_TRANS = dict([
+        ("germline", "germline"),
+        ("chimeric", "chimeric"),
+        ("cell line", "cell_line"),
+    ])
+
+INHERITANCE_MODE = {
+    "Codominant" : "codominant",
+    "Semidominant" : "semi-dominant",
+    "Recessive" : "recessive",
+    "Dominant" : "dominant",
+}
+
+MUTATION_2_SOID = dict([
+    ("Intergenic deletion",     "SO:0000159"),
+    ("Intragenic deletion",     "SO:0000159"),
+    ("Duplication",     "SO:1000035"),
+    ("Insertion",       "SO:0000667"),
+    ("Insertion of gene trap vector",   "SO:0001218"),
+    ("Viral insertion", "SO:0000667"),
+    ("Transposon insertion",    "SO:0001837"),
+    ("Inversion",       "SO:1000036"),
+    ("Nucleotide substitutions",        "SO:0002007"),
+    ("Single point mutation",   "SO:1000008"),
+    ("Translocation",   "SO:0000199"),
+    ("Nucleotide repeat expansion",     "SO:0002162"),
+    ("Not Applicable",  None),
+    ("Not Specified",   None),
+    ("Other",   None),
+    ("Undefined",       None),
+    ])
 
 if __name__ == "__main__":
     main()
