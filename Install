@@ -8,6 +8,7 @@ logit "Cloning ${AGR_CURATION_SCHEMA} from ${AGR_CURATION_SCHEMA_URL}"
 git clone "${AGR_CURATION_SCHEMA_URL}"
 checkexit
 
+logit "Checking out v${AGR_CURATION_SCHEMA_VERSION}"
 pushd ${AGR_CURATION_SCHEMA}
 git checkout "v${AGR_CURATION_SCHEMA_VERSION}"
 checkexit

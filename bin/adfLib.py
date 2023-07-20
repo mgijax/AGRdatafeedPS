@@ -24,10 +24,11 @@ LINKML_VERSION = f'''"linkml_version": "{os.environ.get('AGR_CURATION_SCHEMA_VER
 #   Tuples (n,r) where n is a 0-based count and r is a record
 #
 DO_SAMPLE = os.environ.get('DO_SAMPLE','')
+SAMPLE_COUNT=200
 def mainQuery(results) :
     n = 0
     for r in results:
-        if DO_SAMPLE and n >= 20:
+        if DO_SAMPLE and n >= SAMPLE_COUNT:
             break;
         yield n, r
         n += 1

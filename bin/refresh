@@ -18,6 +18,7 @@ VALIDATOR_DIR="../agr_curation_schema"
 DO_GENERATE=""
 DO_VALIDATE=""
 DO_UPLOAD=""
+DO_NOCLEANUP=""
 TOKEN_FILE=""
 NO_RUN=""
 
@@ -50,9 +51,11 @@ You need to specify at least one of the following options to actually do anythin
 -v 	Validate data files specified in -p option. 
 -u file Upload files specified in -p option to the Alliance submission endpoint. 
 	Argument is the file containing the DQM access token.
+-U file Same as -u except cleanUp=false is passed (good for testing small samples).
 
 Debugging:
 -N	No execute. Skips actually running commands; just prints what it would do.
+-s      Generate sample output (n=20)
 "
 }
 
@@ -121,6 +124,9 @@ function upload {
   aftype=$2
   curation_system="curation" # also: alpha-curation, beta-curation
   url="https://${curation_system}.alliancegenome.org/api/data/submit"
+  if [[ ${DO_NOCLEANUP} ]] ; then
+      url="${url}?cleanUp=false"
+  fi
   token=`cat ${TOKEN_FILE}`
   setFile ${ftype}
   command="curl \
@@ -189,6 +195,12 @@ function parseCommandLine {
 	    TOKEN_FILE="$1"
 	    DO_UPLOAD="true"
 	    ;;  
+        -U)
+	    shift
+            DO_NOCLEANUP="true"
+	    TOKEN_FILE="$1"
+	    DO_UPLOAD="true"
+            ;;
 	-p)
 	    shift
 	    PARTS=(${1//,/ })
