@@ -2,7 +2,7 @@
 import db
 import json
 import re
-from adfLib import LINKML_VERSION, symbolToHtml, getDataProviderDto, mainQuery
+from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery
 
 def getGenes () :
     q = '''
@@ -48,7 +48,7 @@ def getJsonObject (r) :
 
 def main () :
     print('{')
-    print(LINKML_VERSION)
+    print(getHeaderAttributes())
     print('"gene_ingest_set": [')
     for j,r in mainQuery(getGenes()):
         if j: print(',', end='')

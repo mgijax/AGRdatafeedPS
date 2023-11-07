@@ -3,7 +3,7 @@ import sys
 import db
 import json
 import re
-from adfLib import LINKML_VERSION, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log
+from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log
 
 APPROVED_ALLELE_STATUS = 847114
 AUTOLOAD_ALLELE_STATUS = 3983021
@@ -236,7 +236,7 @@ def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) 
 
 def main () :
     print('{')
-    print(LINKML_VERSION)
+    print(getHeaderAttributes())
     print('"allele_ingest_set": [')
     rk2ids = getReferenceIds()
     ak2refs = getAlleleRefs()

@@ -3,7 +3,7 @@ import db
 import json
 import re
 from genes import getGenes
-from adfLib import LINKML_VERSION, symbolToHtml, getDataProviderDto, mainQuery
+from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery
 
 def getDiseaseAnnotations (cfg) :
     q = '''
@@ -195,7 +195,7 @@ def main () :
     }
 
     print('{')
-    print(LINKML_VERSION)
+    print(getHeaderAttributes())
     for i, (section, scfg) in enumerate(cfg.items()):
         ek2note = getPrivateCuratorNotes(scfg)
         if i: print(',', end='')

@@ -3,6 +3,7 @@ import re
 import os
 import sys
 import time
+import db
 
 #
 def log (msg, addTimestamp=True, lineTerminator="\n") :
@@ -13,8 +14,20 @@ def log (msg, addTimestamp=True, lineTerminator="\n") :
     if lineTerminator:
         sys.stderr.write(lineTerminator)
 
+# Returns a string to be used as the "alliance_member_release_version" field for data updates
+# (Added in curation_schema v1.11.0)
+# Concatendates public_version and lastdump_date from mgi_dbinfo.
 #
-LINKML_VERSION = f'''"linkml_version": "{os.environ.get('AGR_CURATION_SCHEMA_VERSION','default')}",''' 
+def getReleaseVersion () :
+    dbi = db.sql('select * from mgi_dbinfo')[0]
+    return '%s %s' % (dbi['public_version'],dbi['lastdump_date'])
+#
+def getHeaderAttributes () :
+    linkml_version = f'''"linkml_version": "{os.environ.get('AGR_CURATION_SCHEMA_VERSION','default')}",'''
+    release_version = f'''"alliance_member_release_version" : "{getReleaseVersion()}",'''
+    return '%s\n%s\n' % (linkml_version, release_version)
+
+
 
 # Wraps the execution of the main query so that we can implement a "sample" option, that outputs
 # a small sample of records. Useful for development. At the moment,a sample is just the first 20 records.
@@ -81,4 +94,3 @@ def getDataProviderDto (curie, pageArea):
         }  
       }
       return dto 
-

@@ -2,7 +2,7 @@
 import db
 import json
 import re
-from adfLib import LINKML_VERSION, symbolToHtml, getDataProviderDto, mainQuery
+from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery
 
 def getAGMnames () :
     q = '''
@@ -109,7 +109,7 @@ def main () :
     agmKey2name = getAGMnames()
     genoKey2comps = getAGMComponents()
     print('{')
-    print(LINKML_VERSION)
+    print(getHeaderAttributes())
     print('"agm_ingest_set": [')
     for j,r in mainQuery(getAGMs()):
         if j: print(',', end='')
