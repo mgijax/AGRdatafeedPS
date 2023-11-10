@@ -39,10 +39,12 @@ Options:
 -d dir	Specifies the parent directory where the output directory will be created.
 	Default = current working directory.
 -p pts	Specify which part(s) to run. Argument is a comma-separated list (no spaces) of any of the following:
-	d	Disease annotations
         g       Genes (and other features)
         a       Alleles
+        c       Constructs and Construct associations
+        v       Variants
         y       Genotypes (AGRs)
+	d	Disease annotations
 
 	If no -p option is provided, all parts are run.
 
@@ -236,9 +238,12 @@ function parseCommandLine {
 
 
 function doParts {
-    # args: cmdAbbrev; fileType; script; schemaFile; grepPattern; allianceFileType
+    # args: cmdAbbrev; fileType; filetype, Alliance file type
     doPart "g" "genes.py"   "gene"   "GENE"
     doPart "a" "alleles.py" "allele" "ALLELE"
+    doPart "c" "constructs.py -t constructs" "construct" "CONSTRUCT"
+    doPart "c" "constructs.py -t associations" "construct_association" "CONSTRUCT_ASSOCIATION"
+    doPart "v" "variants.py" "variant" "VARIANT"
     doPart "y" "agms.py"    "agm"    "AGM"
     doPart "d" "diseaseAnnotations.py" "disease_annotation" "DISEASE_ANNOTATION"
 }
