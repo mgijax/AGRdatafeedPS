@@ -2,7 +2,7 @@
 import db
 import json
 import re
-from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery
+from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, setCommonFields
 
 def getAGMnames () :
     q = '''
@@ -22,7 +22,7 @@ def getAGMs () :
     q = '''
         SELECT
             aa.accid,
-            g._genotype_key,
+            g.*,
             s.strain
         FROM
             GXD_Genotype g,
@@ -103,6 +103,7 @@ def getJsonObject (r, agmKey2name, genoKey2comps) :
         "subtype_name" : "genotype",
         "component_dtos" : genoKey2comps.get(r["_genotype_key"],[]),
     }
+    setCommonFields(r, obj)
     return obj
 
 def main () :

@@ -25,7 +25,7 @@ NO_RUN=""
 # ---------------------
 function usage {
   logit "
-Usage: $0 [-d output_directory][-p d][-g][-v dir][-u file]
+Usage: $0 [-d output_directory][-p types][-g][-v dir][-u file]
 
 Installation settings:
     AGR_CURATION_SCHEMA_VERSION=${AGR_CURATION_SCHEMA_VERSION}
@@ -38,15 +38,16 @@ Options:
 -c n	Specifies the update count for this schema version (1, 2, 3, ...).  Optional.
 -d dir	Specifies the parent directory where the output directory will be created.
 	Default = current working directory.
--p pts	Specify which part(s) to run. Argument is a comma-separated list (no spaces) of any of the following:
+-p types Specify which types(s) to process Argument is a comma-separated list (no spaces) of any of the following:
         g       Genes (and other features)
         a       Alleles
-        c       Constructs and Construct associations
+        c       Constructs
+        ca      Construct associations
         v       Variants
         y       Genotypes (AGRs)
 	d	Disease annotations
 
-	If no -p option is provided, all parts are run.
+	If no -p option is provided, all types are processed
 
 You need to specify at least one of the following options to actually do anything:
 -g      Generate data files specified in -p option.
@@ -113,8 +114,10 @@ function validate {
   # ASSUMES the validator is checked out to the correct schema version!
   #
   source ./venv/bin/activate
-  python validateJsonFile.py -d ${FILE} -s ${VALIDATOR_DIR}/generated/jsonschema/allianceModel.schema.json
+  pushd ../agr_curation_schema
+  python util/validate_agr_schema.py -i ${FILE}
   checkexit 
+  popd
   logit "Validated: ${FILE}"
   deactivate
 }
@@ -242,7 +245,7 @@ function doParts {
     doPart "g" "genes.py"   "gene"   "GENE"
     doPart "a" "alleles.py" "allele" "ALLELE"
     doPart "c" "constructs.py -t constructs" "construct" "CONSTRUCT"
-    doPart "c" "constructs.py -t associations" "construct_association" "CONSTRUCT_ASSOCIATION"
+    doPart "ca" "constructs.py -t associations" "construct_association" "CONSTRUCT_ASSOCIATION"
     doPart "v" "variants.py" "variant" "VARIANT"
     doPart "y" "agms.py"    "agm"    "AGM"
     doPart "d" "diseaseAnnotations.py" "disease_annotation" "DISEASE_ANNOTATION"

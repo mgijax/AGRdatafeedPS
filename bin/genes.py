@@ -2,12 +2,12 @@
 import db
 import json
 import re
-from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery
+from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, setCommonFields
 
 def getGenes () :
     q = '''
         SELECT
-            aa.accid, mm.symbol, mm.name
+            aa.accid, mm.*
         FROM
             MRK_Marker mm,
             ACC_Accession aa
@@ -28,8 +28,6 @@ def getJsonObject (r) :
         "curie" : r["accid"],
         "data_provider_dto": getDataProviderDto(r["accid"], "gene"),
         "taxon_curie": "NCBITaxon:10090",
-        "created_by_curie": "MGI",
-        "updated_by_curie": "MGI",
         "internal": False,
         "gene_symbol_dto" : {
 	    "name_type_name" : "nomenclature_symbol",
@@ -44,6 +42,7 @@ def getJsonObject (r) :
 	    "internal" : False
 	}
     }
+    setCommonFields(r, obj)
     return obj
 
 def main () :

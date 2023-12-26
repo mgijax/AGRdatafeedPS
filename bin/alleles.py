@@ -3,7 +3,7 @@ import sys
 import db
 import json
 import re
-from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log
+from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields
 
 APPROVED_ALLELE_STATUS = 847114
 AUTOLOAD_ALLELE_STATUS = 3983021
@@ -96,10 +96,8 @@ def getAlleleSecondaryIds () :
 def getAlleles () :
     q = '''
         SELECT
-            a._allele_key,
+            a.*,
             aa.accid,
-            a.symbol,
-            a.name,
             CASE
               WHEN m.term = 'Not Specified' THEN ''
               WHEN m.term = 'Not Applicable' THEN ''
@@ -110,7 +108,6 @@ def getAlleles () :
               WHEN c.term = 'Not Specified' THEN ''
               ELSE c.term
             END as collection,
-            a.isextinct,
             CASE
               WHEN st.term = 'Autoload' THEN 'autoloaded'
               ELSE st.term
@@ -158,6 +155,7 @@ def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) 
         "is_extinct" : (r["isextinct"] == 1),
         "reference_curies" : allrefids
     }
+    setCommonFields(r, obj)
     # inheritance mode
     mode = INHERITANCE_MODE.get(r["mode"], None)
     if mode:

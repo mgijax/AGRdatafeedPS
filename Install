@@ -27,5 +27,7 @@ export PYTHONPATH=.:$PYTHONPATH
 
 logit "Installing jsonschema"
 pip install jsonschema
+logit "Installing click"
+pip install click
 
 deactivate

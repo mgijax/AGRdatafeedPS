@@ -3,7 +3,35 @@ import re
 import os
 import sys
 import time
+import datetime
 import db
+
+#----------------------------------
+# See: http://henry.precheur.org/projects/rfc3339 
+from rfc3339 import rfc3339
+date_re = re.compile(r'(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)')
+#----------------------------------
+# RFC 3339 timestamps
+#
+# With no arguments, returns the current date-time in RFC-3339 format
+# With a string argument of the form 'yyyy-mm-dd', converts to rfc3339 format and returns.
+# Note that simply concatenating a string such as 'T00:00:00-05:00' to the date is not
+# sufficient because of DST differences (i.e., for part of the year, the offset is -04:00
+# rather that "-05:00"
+# Examples:
+#   getTimeStamp() --> "2017-01-26T15:00:42-05:00"
+#   getTimeStamp("2007-01-15") --> "2007-01-15T00:00:00-05:00"
+#   getTimeStamp("2014-05-01") --> "2014-05-01T00:00:00-04:00"
+#   getTimeStamp("2023-11-15 09:21:20") --> 
+#
+def getTimeStamp(s = None):
+    if s:
+        m = date_re.match(s)
+        d = datetime.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),  int(m.group(4)), int(m.group(5)), int(m.group(6)))
+        return rfc3339(d)
+    else:
+        return rfc3339(time.time())
+#-----------------------------------
 
 #
 def log (msg, addTimestamp=True, lineTerminator="\n") :
@@ -94,3 +122,13 @@ def getDataProviderDto (curie, pageArea):
         }  
       }
       return dto 
+
+# Sets common fields in the object, based on values in the db record
+def setCommonFields (rec, obj, internal=False, obsolete=False) :
+    obj["internal"] = internal
+    obj["obsolete"] = obsolete
+    if rec.has_key("creation_date"): obj["date_created"] = getTimeStamp(rec["creation_date"])
+    if rec.has_key("modification_date"): obj["date_updated"] = getTimeStamp(rec["modification_date"])
+    obj["created_by_curie"] = "MGI:curation_staff"
+    obj["updated_by_curie"] = "MGI:curation_staff"
+    

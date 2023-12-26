@@ -4,14 +4,21 @@
 # Script to generate construct objects for alleles in MGI for submission to the Alliance curation site.
 # Copied and adapted from the original AGRdatafeed product.
 #
-# Alleles that have expressed components and/or driver genes are considered to
-# have constructs. One construct is created per allele, which  may contain multiple components.
-# (e.g., multiple expressed components, or an expressed component and a driver, or ...)
+# A Construct object connects an allele with its engineered components, specifically, expressed and/or driver genes.
+# The Alliance model divides components for an allele into those having curie IDs in the db (e.g., human genes) and
+# those without (e.g. bacterial genes). A Construct object contains a list of the latter kind
+# (ConstructComponentSlotAnnotation), and has a set of associations to the former kind (ConstructGenomicEntityAssociation).
 #
-# The alliance curation schema wants an identifier for each construct. MGI does not have
+# This script produces one of two outputs, depending on the -t command line arg:
+#  -t constructs       ConstructDTO object, one per allele having constructs. Contains list of constructs lacking curies.
+#  -t associations     ConstructGenomicEntityAssociation, associations between constructs and components with curies.
+# (Yes, you have to run the script twice to get the complete output.)
+#
+# The Alliance model wants an identifier for each construct. MGI does not have
 # actual construct objects, much less identifiers for them. So this script creates ersatz
 # IDs for the constructs, based on the owning allele's id. If an allele's id is MGI:123456,
-# its contruct has the id MGI:123456_con
+# its contruct has the id MGI:123456_con. This works because an allele only has at most a single construct 
+# (the way we're doing things).
 #
 
 import sys
@@ -19,7 +26,7 @@ import db
 import json
 import re
 import argparse
-from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log
+from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields
 
 EXPRESSES_cat_key = 1004
 DRIVER_cat_key = 1006
@@ -29,11 +36,21 @@ def loadNonMouseGeneIds () :
     for r in db.sql(qConstructNonMouseComponents):
         mk2nmdId[r['_marker_key']] = r['accid']
 
-rk2id = {}
+rk2id = {} # _refs_key -> either PMID or MGI id
 def loadRefIds () :
-    for r in db.sql(qRefs):
+    for r in db.sql(qConstructRefs):
         rk2id[r['_refs_key']] = ('PMID:' + r['pmid']) if r['pmid'] else r['mgiid']
         
+rk2note = {} # _relationship_key -> note obj
+def loadConstructNotes () :
+    for n in db.sql(qConstructNotes):
+        rk2note[n['_relationship_key']] = n
+        # some notes mistakenly surrounded by double quote characters
+        # remove them here
+        if n['note'].startswith('"') and n['note'].endswith('"'):
+            n['note'] = n['note'][1:-1]
+    log("Loaded notes for %d constructs." % len(rk2note))
+
 def loadRelationship (key) :
     rels = []
     # read the relationships 
@@ -64,7 +81,20 @@ def rel2constrComp (r, construct_id) :
     else:
         raise RuntimeError("Internal error: unknown _category_key: " + str(r))
 
-    if gid:
+    note = rk2note.get(r["_relationship_key"], None)
+    note_dto = None
+    if note:
+        note_dto = {
+          "free_text": note["note"],
+          "note_type_name": "comment",
+        }
+        setCommonFields(note, note_dto)
+
+
+    # NOTE: additional constraint that the marker type is gene. Only needed while 
+    # Alliance persistent store contains only genes. When Allianec contains all markers,
+    # can remove the added constraint.
+    if gid and r["_marker_type_key"] == 1:
         # we have an id for the gene. Return a ConstructGenomicEntityAssociationDTO
         rval = {
           "construct_identifier": construct_id,
@@ -73,31 +103,21 @@ def rel2constrComp (r, construct_id) :
           "evidence_curies": [
             rk2id[r['_refs_key']]
           ],  
-          #"note_dtos": [
-          #  {   
-          #    "free_text": "note about association",
-          #    "note_type_name": "comment",
-          #    "internal": false
-          #      }   
-          #],  
-          "internal": False,
-          "obsolete": False,
-          #"date_created": "2015-04-09T10:15:30+00:00",
-          #"date_updated": "2022-07-11T13:12:51+00:00",
-          #"created_by_curie": "WB:WBPerson002314",
-          #"updated_by_curie": "WB:WBPerson010002"
         }
+        if note_dto: rval["note_dtos"] = [ note_dto ]
+        setCommonFields(r, rval)
         return ("ConstructGenomicEntityAssociationDTO", rval)
     else:
         # don't have a curie for the gene. Return a ConstructComponentSlotAnnotationDTO
         rval = {
             "relation_name" : reln,
             "component_symbol" : symbol,
-            "internal" : False,
             "evidence_curies": [
               rk2id[r['_refs_key']]
             ],  
         }
+        if note_dto: rval["note_dtos"] = [ note_dto ]
+        setCommonFields(r, rval)
         if r["taxonid"]:
             rval["taxon_curie"] = "NCBITaxon:" + r["taxonid"]
         if r["commonname"]:
@@ -113,7 +133,9 @@ def main () :
     opts = getOpts()
     loadNonMouseGeneIds()
     loadRefIds()
-    #
+    loadConstructNotes()
+    # Get all relationship records for alleles (expresses-component and driven-by).
+    # Then aggregate them into a single list of components per allele.
     aid2rels = {}
     for r in loadRelationship(EXPRESSES_cat_key):
         aid2rels.setdefault(r['allele'],[]).append(r)
@@ -133,6 +155,12 @@ def main () :
         arels = aid2rels[aid]
         ccomps = []
         cgassocs = []
+
+        minCreatedDate = None
+        minCreatedBy = None
+        maxUpdatedDate = None
+        maxUpdatedBy = None
+       
         for arel in arels:
            tp, obj = rel2constrComp(arel, construct_id)
            if tp == "ConstructComponentSlotAnnotationDTO":
@@ -142,6 +170,14 @@ def main () :
            else:
                raise RuntimeError("Unknown type: " + str(tp))
 
+           if not minCreatedDate or (obj["date_created"] < minCreatedDate):
+               minCreatedDate = obj["date_created"]
+               minCreatedBy = obj["created_by_curie"]
+
+           if not maxUpdatedDate or (obj["date_updated"] > maxUpdatedDate):
+               maxUpdatedDate = obj["date_updated"]
+               maxUpdatedBy = obj["created_by_curie"]
+
         if opts.type == "associations":
             for a in cgassocs:
                 if not first: print(",", end=' ')
@@ -149,24 +185,30 @@ def main () :
                 print(json.dumps(a, indent=2))
             continue
 
-        # if opts.type == "constructs"...
+        # else opts.type == "constructs"...
         symbol = arels[0]["allelesymbol"] + ' construct'
         obj = {
           "internal" : False,
+          "obsolete" : False,
+          "date_created" : minCreatedDate,
+          "created_by_curie" : minCreatedBy,
+          "date_updated" : maxUpdatedDate,
+          "updated_by_curie" : maxUpdatedBy,
           "mod_internal_id" : construct_id,
           "construct_symbol_dto" : {
               "name_type_name": "nomenclature_symbol",
               "format_text": symbol,
               "display_text": symbol,
-              # "evidence_curies": [], #PMIDs
               "internal": False,
           },
-          "construct_component_dtos": ccomps,
           "data_provider_dto": getDataProviderDto(aid, "allele"),
         }
+        if len(ccomps): obj["construct_component_dtos"] = ccomps
+        #
         if not first: print(",", end=' ')
         print(json.dumps(obj, indent=2))
         first=False
+        #
     print("]}")
 
 #
@@ -185,12 +227,18 @@ tConstructRelationships = '''
         mo.commonname,
         moa.accid as taxonid,
         mm._marker_key,
+        mm._marker_type_key,
         am.accid as mgiid,
         mm.symbol as genesymbol,
         rr.term as relationship,
         q.term as qualifier,
         e.abbreviation as evidencecode,
-        r._refs_key
+        r._refs_key,
+
+        r.creation_date,
+        r.modification_date,
+        r._createdby_key,
+        r._modifiedby_key
     FROM
         MGI_Relationship r
         LEFT JOIN ACC_Accession am 
@@ -236,7 +284,7 @@ tConstructProperties = '''
     ORDER BY r._relationship_key, p.sequenceNum
     '''
 
-# query to get accids for non-mouse drivers 
+# query to get accids for non-mouse component genes 
 qConstructNonMouseComponents = '''
     SELECT distinct a.accid, m._marker_key
     FROM
@@ -252,7 +300,9 @@ qConstructNonMouseComponents = '''
     AND a._logicaldb_key in (64,47,172,225) /* HGNC, RGD, ZFIN, Xenbase */
     AND a.preferred = 1
     '''
-qRefs = '''
+
+# query to return all construct association references
+qConstructRefs = '''
     SELECT DISTINCT r._refs_key, a1.accid as mgiid, a2.accid as pmid
     FROM
         MGI_Relationship r
@@ -268,6 +318,15 @@ qRefs = '''
             AND a2._logicaldb_key = 29
             AND a2.preferred = 1
     WHERE r._category_key in (1004,1006)
+'''
+
+# query to returns notes attached to construct associations
+qConstructNotes = '''
+    SELECT r._relationship_key, n.*
+    FROM mgi_note n, mgi_relationship r
+    WHERE n._notetype_key = 1042
+    AND n._object_key = r._relationship_key
+    AND r._category_key IN (1004,1006)
 '''
 
 main()

@@ -3,7 +3,7 @@ import db
 import json
 import re
 from genes import getGenes
-from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery
+from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, getTimeStamp, setCommonFields
 
 def getDiseaseAnnotations (cfg) :
     q = '''
@@ -131,29 +131,19 @@ def getPrivateCuratorNotes (cfg) :
         ek2note[r['_object_key']] = r['note']
     return ek2note
 
-def formatDate (s) :
-    s = re.sub('\.[0-9]*$', '', s)
-    s = s.replace(" ", "T")
-    s = s + "Z"
-    return s
-
 def getJsonObject (cfg, r, ek2note, annotKey2inferred, submittedGeneIds) :
     unique_id = "MGI:diseaseannotation_%s_%s" % (r['_annot_key'], r['_annotevidence_key'])
     obj = {
       "mod_internal_id" : unique_id,
-      "internal": False,
       "evidence_code_curies": [ "ECO:0000033" ],  # all disease annots use TAS
       "annotation_type_name" : "manually_curated",
       "reference_curie": "PMID:"+r["pmid"] if r["pmid"] else r["mgipubid"],
       "data_provider_dto": getDataProviderDto(r["subjectid"], cfg["subjecttype"]),
       "do_term_curie": r["doid"],
-      "created_by_curie": "MGI:curation_staff",
-      "updated_by_curie": "MGI:curation_staff",
       "disease_relation_name": cfg["predicate"],
       "negated" : r["qualifier"] == "NOT",
-      "date_created" : formatDate(r["creation_date"]),
-      "date_updated" : formatDate(r["modification_date"])
     }
+    setCommonFields(r, obj)
     #
     obj[cfg["curie_field"]] = r["subjectid"]
     #
