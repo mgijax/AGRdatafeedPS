@@ -9,8 +9,6 @@ source ../Configuration
 
 # ---------------------
 # Initialize vars
-LOGFILE=""
-OUTPUT_DIR="."
 RELEASE_COUNT=""
 DO_ALL="true"
 DO_SAMPLE=""
@@ -19,25 +17,27 @@ DO_GENERATE=""
 DO_VALIDATE=""
 DO_UPLOAD=""
 DO_NOCLEANUP=""
-TOKEN_FILE=""
 NO_RUN=""
 
 # ---------------------
 function usage {
-  logit "
-Usage: $0 [-d output_directory][-p types][-g][-v dir][-u file]
+  echo "
+AGRdatafeedPS: for sending data to the Alliance curation database
 
-Installation settings:
+Usage: $0 [-d output_directory][-p types][-g][-v dir][-u]
+
+Current env settings:
     AGR_CURATION_SCHEMA_VERSION=${AGR_CURATION_SCHEMA_VERSION}
+    LOGFILE=${LOGFILE}
+    OUTPUT_DIR=${OUTPUT_DIR}
+    TOKEN_FILE=${TOKEN_FILE}
 	
 Options:
 -h	Print this message and exit.
--C file	Sources the specified config file.
--l file Specifies a log file. By default, log messages are sent to stdout.
+-l file Specifies a log file. By default, log messages are sent to stdout. Overrides LOGFILE.
 
 -c n	Specifies the update count for this schema version (1, 2, 3, ...).  Optional.
--d dir	Specifies the parent directory where the output directory will be created.
-	Default = current working directory.
+-d dir	Specifies the parent directory where the output directory will be created. Overrides OUTPUT_DIR.
 -p types Specify which types(s) to process Argument is a comma-separated list (no spaces) of any of the following:
         g       Genes (and other features)
         a       Alleles
@@ -52,9 +52,8 @@ Options:
 You need to specify at least one of the following options to actually do anything:
 -g      Generate data files specified in -p option.
 -v 	Validate data files specified in -p option. 
--u file Upload files specified in -p option to the Alliance submission endpoint. 
-	Argument is the file containing the DQM access token.
--U file Same as -u except cleanUp=false is passed (good for testing small samples).
+-u      Upload files specified in -p option to the Alliance submission endpoint. 
+-U      Same as -u except cleanUp=false is passed (good for testing small samples).
 
 Debugging:
 -N	No execute. Skips actually running commands; just prints what it would do.
@@ -196,14 +195,10 @@ function parseCommandLine {
 	    DO_VALIDATE="true"
 	    ;;  
 	-u) 
-	    shift
-	    TOKEN_FILE="$1"
 	    DO_UPLOAD="true"
 	    ;;  
         -U)
-	    shift
             DO_NOCLEANUP="true"
-	    TOKEN_FILE="$1"
 	    DO_UPLOAD="true"
             ;;
 	-p)
