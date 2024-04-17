@@ -20,7 +20,6 @@ def getDiseaseAnnotations (cfg) :
             ve.modification_date
         FROM
             VOC_Annot va,
-            GXD_Genotype gg,
             VOC_Term vt,
             ACC_Accession ag,
             ACC_Accession av,
@@ -32,9 +31,8 @@ def getDiseaseAnnotations (cfg) :
                 AND pma._logicaldb_key = 29
         WHERE va._annottype_key                  = %(_annottype_key)d
         AND va._qualifier_key = qt._term_key
-        AND va._object_key = gg._genotype_key
         AND va._term_key = vt._term_key
-        AND ag._object_key = gg._genotype_key
+        AND ag._object_key = va._object_key
         AND ag._mgitype_key                      = %(_mgitype_key)d
         AND ag._logicaldb_key = 1
         AND ag.preferred = 1
