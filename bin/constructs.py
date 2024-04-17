@@ -99,7 +99,7 @@ def rel2constrComp (r, construct_id) :
         rval = {
           "construct_identifier": construct_id,
           "genomic_entity_relation_name": reln,
-          "genomic_entity_curie": gid,
+          "genomic_entity_identifier": gid,
           "evidence_curies": [
             rk2id[r['_refs_key']]
           ],  

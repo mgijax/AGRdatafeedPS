@@ -156,9 +156,9 @@ def getJsonObject (cfg, r, ek2note, annotKey2inferred, submittedGeneIds) :
     igene = inferred.get('inferred_gene', None)
     iallele = inferred.get('inferred_allele', None)
     if igene and igene in submittedGeneIds:
-        obj['inferred_gene_curie'] = igene
+        obj['inferred_gene_identifier'] = igene
     if iallele:
-        obj['inferred_allele_curie'] = iallele
+        obj['inferred_allele_identifier'] = iallele
     #
     return obj
 
@@ -170,14 +170,14 @@ def main () :
             "_annottype_key" : 1020,
             "_mgitype_key"   : 12,
             "predicate"      : "is_model_of",
-	    "curie_field"    : "agm_curie",
+	    "curie_field"    : "agm_identifier",
             "subjecttype"    : "genotype",
         },
         "disease_allele_ingest_set": {
             "_annottype_key" : 1021,
             "_mgitype_key"   : 11,
             "predicate"      : "is_implicated_in",
-	    "curie_field"    : "allele_curie",
+	    "curie_field"    : "allele_identifier",
             "subjecttype"    : "allele",
         }
     }

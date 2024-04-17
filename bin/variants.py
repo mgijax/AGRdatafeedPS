@@ -85,15 +85,18 @@ def getJsonObj(r) :
   aid = r["allele_id"]
   vid = aid + "_var" + str(r["_variant_key"])
   rr = {   
-      "curie": vid,
-      #"mod_internal_id": vid,
+      "mod_internal_id": vid,
       "variant_status_name" : "public",
       "data_provider_dto": getDataProviderDto(aid, "allele"),
       "taxon_curie": "NCBITaxon:10090",
       "variant_status_name": "public",
       "variant_type_curie": vtype,
   }
-  if r["effect"]: rr["source_general_consequence_curie"] = r["effect"]
+  if r["effect"]: 
+      rr["source_general_consequence_dtos"] = [{
+          "source_general_consequence_curie": r["effect"],
+          "internal" : False
+      }]
   if r["notes"]:
       note_dtos = []
       for rn in r["notes"]:

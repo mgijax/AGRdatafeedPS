@@ -86,7 +86,7 @@ def getAGMComponents () :
     gk2comps = {}
     for r in db.sql(q, 'auto'):
         gk2comps.setdefault(r["_genotype_key"],[]).append({
-            "allele_curie" : r["accid"],
+            "allele_identifier" : r["accid"],
             "zygosity_curie" : mgi2geno[r["term"]],
             "internal" : False
         })
@@ -95,7 +95,7 @@ def getAGMComponents () :
 def getJsonObject (r, agmKey2name, genoKey2comps) :
     
     obj = {
-        "curie" : r["accid"],
+        "mod_entity_id" : r["accid"],
         "name" : (agmKey2name.get(r["_genotype_key"], "") + " [background:] " + symbolToHtml(r["strain"])).strip(),
         "taxon_curie": "NCBITaxon:10090",
         "data_provider_dto": getDataProviderDto(r["accid"], "genotype"),
