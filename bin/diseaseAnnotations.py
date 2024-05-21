@@ -1,4 +1,5 @@
 
+import sys
 import db
 import json
 import re
@@ -63,6 +64,16 @@ def getSubmittedGeneIds ():
 def getRollups ():
     # builds a map from annotation key to inferred gene and/or allele ids.
 
+    #
+    q = '''
+        select _marker_key
+        from mrk_marker
+        where _marker_type_key = 12
+        '''
+    mouseTgKeys = set()
+    for r in db.sql(q):
+        mouseTgKeys.add(r['_marker_key'])
+
     annotKey2inferred = {}
     #
     # The query runs once for derived gene annotations and once for
@@ -70,15 +81,22 @@ def getRollups ():
     cfgs = [{
         '_annottype_key' : 1023,
         '_mgitype_key' : 2,
-        'fieldname' : 'inferred_gene'
+        '_logicaldb_key' : '1',
+        'fieldname' : 'inferred_gene',
     },{
         '_annottype_key' : 1029,
         '_mgitype_key' : 11,
-        'fieldname' : 'inferred_allele'
+        '_logicaldb_key' : '1',
+        'fieldname' : 'inferred_allele',
+    },{
+        '_annottype_key' : 1032,
+        '_mgitype_key' : 2,
+        '_logicaldb_key' : '47,64,172,225',
+        'fieldname' : 'inferred_gene',
     }]
     #
     q = '''
-        select 
+        select distinct
           va._object_key,
           a1.accid,
           cast(vep.value as integer) as _annot_key
@@ -95,7 +113,7 @@ def getRollups ():
         and va._annottype_key = %(_annottype_key)d
         and a1._object_key = va._object_key
         and a1._mgitype_key = %(_mgitype_key)d
-        and a1._logicaldb_key = 1
+        and a1._logicaldb_key in (%(_logicaldb_key)s)
         and a1.preferred = 1
         '''
     #
@@ -104,7 +122,13 @@ def getRollups ():
         for r in db.sql(q % cfg, 'auto'):
             ak = r['_annot_key']
             mgiid = r['accid']
-            annotKey2inferred.setdefault(ak, {})[fieldname] = mgiid
+            inferreds = annotKey2inferred.setdefault(ak, {})
+            if fieldname in inferreds:
+                if r['_object_key'] in mouseTgKeys:
+                    #sys.stderr.write("Skipping replacement because inferred gene is a Tg.\n")
+                    continue
+                #sys.stderr.write("Replacing " + fieldname + " " + inferreds[fieldname] + " with " + mgiid + "\n")
+            inferreds[fieldname] = mgiid
     #
     return annotKey2inferred
             
@@ -155,7 +179,7 @@ def getJsonObject (cfg, r, ek2note, annotKey2inferred, submittedGeneIds) :
     inferred = annotKey2inferred.get(r['_annot_key'], {})
     igene = inferred.get('inferred_gene', None)
     iallele = inferred.get('inferred_allele', None)
-    if igene and igene in submittedGeneIds:
+    if igene and (igene in submittedGeneIds or not igene.startswith('MGI:')):
         obj['inferred_gene_identifier'] = igene
     if iallele:
         obj['inferred_allele_identifier'] = iallele
@@ -170,14 +194,14 @@ def main () :
             "_annottype_key" : 1020,
             "_mgitype_key"   : 12,
             "predicate"      : "is_model_of",
-	    "curie_field"    : "agm_identifier",
+            "curie_field"    : "agm_identifier",
             "subjecttype"    : "genotype",
         },
         "disease_allele_ingest_set": {
             "_annottype_key" : 1021,
             "_mgitype_key"   : 11,
             "predicate"      : "is_implicated_in",
-	    "curie_field"    : "allele_identifier",
+            "curie_field"    : "allele_identifier",
             "subjecttype"    : "allele",
         }
     }
