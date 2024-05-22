@@ -4,10 +4,12 @@ import json
 import re
 
 from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, setCommonFields
-#-----------------------------------
+
+# ----------------------------------------------------------
 # Mapping from MCV term key to SO id.
 # Initialize with hard-coded mappings then load what's in the db (which is incomplete).
-#
+# ----------------------------------------------------------
+
 MCV2SO = { 
     #"complex/cluster/region"
     6238175 : "SO:0000110",
@@ -45,31 +47,84 @@ def initMCV2SO () :
         if m:
             MCV2SO[r['_term_key']] = m.group(0)
 
-initMCV2SO()
+# ----------------------------------------------------------
+# ----------------------------------------------------------
 
-def getGenes () :
-    q = '''
-        SELECT
-            aa.accid, mm.*, mc._mcvterm_key
-        FROM
-            MRK_Marker mm,
-            ACC_Accession aa,
-            MRK_MCV_Cache mc
-        WHERE
-            mm._organism_key = 1
-            and mm._marker_type_key = 1
-            and mm._marker_status_key = 1
-            and mm._marker_key = mc._marker_key
-            and mc.qualifier = 'D'
-            and mm._marker_key = aa._object_key
-            and aa._mgitype_key = 2
-            and aa._logicaldb_key = 1
-            and aa.preferred = 1
-            and aa.private = 0
-        '''
-    return db.sql(q, 'auto')
+# Returns a dictionary from name to set of marker keys.
+def getGeneSets () :
+    sets = [
+        (qGeneHasPhenotype,"hasPhenotype"),
+        (qGeneHasImpc,"hasImpc"),
+        (qGeneHasExpression,"hasExpression"),
+        (qGeneHasExpressionImage, "hasExpressionImage"),
+        ]
+    rval = {}
+    for (q,n) in sets:
+        rval[n] = qset = set()
+        for r in db.sql(q):
+            qset.add(r['_marker_key'])
+    return rval
 
-def getJsonObject (r) :
+# ----------------------------------------------------------
+# Cross References
+# ----------------------------------------------------------
+
+LDB2PREFIX = {
+    "Ensembl Gene Model" : "ENSEMBL:",
+    "Entrez Gene" : "NCBI_Gene:",
+    "TrEMBL" : "UniProtKB:",
+    "SWISS-PROT" : "UniProtKB:",
+}
+
+# build map from marker key to the list of xrefs for that marker
+def getXrefs () :
+    mk2xrefs = {}
+    for r in db.sql(qXrefs, 'auto'):
+        mk2xrefs.setdefault(r['_marker_key'], []).append(r)
+    return mk2xrefs
+
+def getFormattedXrefs (mkey, xrefs, gsets) :
+    xrs = xrefs.get(mkey, None)
+    xrs2 = []
+    if not xrs:
+        return xrs2
+    for xr in xrs:
+        if xr["dbname"] == "MGI" :
+            pgs = ["gene","gene/references"]
+            if mkey in gsets["hasExpression"]:
+                pgs.append("gene/expression")
+            if mkey in gsets["hasExpressionImage"]:
+                pgs.append("gene/expression_images")
+            if mkey in gsets["hasPhenotype"]:
+                pgs.append('gene/phenotypes')
+            if mkey in gsets["hasImpc"]:
+                pgs.append('gene/phenotypes_impc')
+            for pg in pgs:
+                xrDto = {
+                    "display_name" : xr["accid"],
+                    "referenced_curie" : xr["accid"],
+                    "page_area" : pg,
+                    "prefix" : "MGI",
+                    "internal" : False,
+                } 
+                xrs2.append(xrDto)
+        else :
+            prefix = LDB2PREFIX[xr["dbname"]]
+            xrDto = {
+                "display_name" : prefix + xr["accid"],
+                "referenced_curie" : prefix + xr["accid"],
+                "page_area" : "default",
+                "prefix" : prefix[:-1],
+                "internal" : False,
+            }
+            xrs2.append(xrDto)
+    return xrs2
+
+# ----------------------------------------------------------
+# ----------------------------------------------------------
+
+
+def getJsonObject (r, xrefs, gsets) :
     obj = {
         "mod_entity_id" : r["accid"],
         "gene_type_curie" : MCV2SO[r['_mcvterm_key']],
@@ -90,18 +145,86 @@ def getJsonObject (r) :
         }
     }
     setCommonFields(r, obj)
+    obj["cross_reference_dtos"] = getFormattedXrefs(r["_marker_key"], xrefs, gsets)
     return obj
 
 def main () :
+    initMCV2SO()
+    xrefs = getXrefs()
+    gsets = getGeneSets()
+
     print('{')
     print(getHeaderAttributes())
     print('"gene_ingest_set": [')
-    for j,r in mainQuery(getGenes()):
+    for j,r in mainQuery(db.sql(qGenes, 'auto')):
         if j: print(',', end='')
-        o = getJsonObject(r)
-        print(json.dumps(o))
+        o = getJsonObject(r, xrefs, gsets)
+        print(json.dumps(o, indent=2))
     print(']')
     print('}')
+
+# ----------------------------------------------------------
+# Queries
+# ----------------------------------------------------------
+
+# Basic info for each gene
+qGenes = '''
+    SELECT
+        aa.accid, mm.*, mc._mcvterm_key
+    FROM
+        MRK_Marker mm,
+        ACC_Accession aa,
+        MRK_MCV_Cache mc
+    WHERE
+        mm._organism_key = 1
+        and mm._marker_type_key = 1
+        and mm._marker_status_key = 1
+        and mm._marker_key = mc._marker_key
+        and mc.qualifier = 'D'
+        and mm._marker_key = aa._object_key
+        and aa._mgitype_key = 2
+        and aa._logicaldb_key = 1
+        and aa.preferred = 1
+        and aa.private = 0
+    '''
+
+# Cross references
+qXrefs = '''
+    SELECT m._marker_key, a.accid, a._logicaldb_key, d.name as dbname, a.creation_date, a.modification_date
+    FROM ACC_Accession a, MRK_Marker m, ACC_LogicalDB d
+    WHERE a._object_key = m._marker_key
+    AND a._mgitype_key = 2
+    AND a._logicaldb_key in (1, 13, 41, 55, 60) /* MGI, SwissProt, Trembl, EntrezGene, Ensembl gene model*/
+    and a._logicaldb_key = d._logicaldb_key
+    and a.preferred = 1
+    '''
+# genes with phenotype annots
+qGeneHasPhenotype = ''' 
+    SELECT distinct _object_key as _marker_key
+    FROM VOC_Annot
+    WHERE _annottype_key = 1015 /* MP-Gene */
+    '''
+
+# genes for alleles in the IMPC collection
+qGeneHasImpc = ''' 
+    SELECT distinct _marker_key
+    FROM ALL_Allele
+    WHERE _collection_key = 24755824 /* IMPC */
+    '''
+
+# genes that have expression data
+qGeneHasExpression = '''
+    SELECT distinct _marker_key
+    FROM GXD_Expression
+    '''
+
+# genes that have expression data
+qGeneHasExpressionImage = '''
+    SELECT distinct _marker_key
+    FROM GXD_Expression
+    WHERE hasimage = 1
+    '''
+#########################################################
 
 if __name__ == "__main__":
     main()
