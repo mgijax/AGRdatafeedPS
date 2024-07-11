@@ -3,7 +3,7 @@ import sys
 import db
 import json
 import re
-from genes import getGenes
+from genes import qGenes
 from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, getTimeStamp, setCommonFields
 
 def getDiseaseAnnotations (cfg) :
@@ -53,7 +53,7 @@ def getDiseaseAnnotations (cfg) :
 # This function imports/uses the query from genes.py to get this set.
 def getSubmittedGeneIds ():
     ids = set()
-    for g in getGenes():
+    for g in db.sql(qGenes, 'auto'):
         ids.add(g['accid'])
     return ids
 
