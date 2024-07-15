@@ -278,6 +278,8 @@ FUNC_IMPACT = dict([
         ("Conditional ready", "conditional_ready"),
         ("Humanized sequence", "humanized_sequence"),
         ("Lineage barcode", "lineage_barcode"),
+        ("Altered localization", "altered_localization"),
+        ("Inducible degradation", "inducible_degradation"),
     ])
 
 GERMLINE_TRANS = dict([
