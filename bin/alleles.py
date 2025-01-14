@@ -141,17 +141,17 @@ def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) 
         "taxon_curie": "NCBITaxon:10090",
         "internal": False,
         "allele_symbol_dto" : {
-	    "name_type_name" : "nomenclature_symbol",
-	    "format_text" : symbolToHtml(r["symbol"]),
-	    "display_text" : symbolToHtml(r["symbol"]),
-	    "internal" : False,
-	},
+            "name_type_name" : "nomenclature_symbol",
+            "format_text" : symbolToHtml(r["symbol"]),
+            "display_text" : symbolToHtml(r["symbol"]),
+            "internal" : False,
+        },
         "allele_full_name_dto" : {
-	    "name_type_name" : "full_name",
-	    "format_text" : symbolToHtml(r["name"]),
-	    "display_text" : symbolToHtml(r["name"]),
-	    "internal" : False
-	},
+            "name_type_name" : "full_name",
+            "format_text" : symbolToHtml(r["name"]),
+            "display_text" : symbolToHtml(r["name"]),
+            "internal" : False
+        },
         "is_extinct" : (r["isextinct"] == 1),
         "reference_curies" : allrefids
     }
