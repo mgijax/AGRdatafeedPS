@@ -126,7 +126,7 @@ def getFormattedXrefs (mkey, xrefs, gsets) :
 
 def getJsonObject (r, xrefs, gsets) :
     obj = {
-        "mod_entity_id" : r["accid"],
+        "primary_external_id" : r["accid"],
         "gene_type_curie" : MCV2SO[r['_mcvterm_key']],
         "data_provider_dto": getDataProviderDto(r["accid"], "gene"),
         "taxon_curie": "NCBITaxon:10090",

@@ -136,7 +136,7 @@ def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) 
     allrefids = list(set(map(lambda r: r["preferredRefId"], refs)))
     allrefids.sort()
     obj = {
-        "mod_entity_id" : r["accid"],
+        "primary_external_id" : r["accid"],
         "data_provider_dto": getDataProviderDto(r["accid"], "allele"),
         "taxon_curie": "NCBITaxon:10090",
         "internal": False,

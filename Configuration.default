@@ -13,7 +13,7 @@ export PG_1LINE_PASSFILE=""
 
 export AGR_CURATION_SCHEMA="agr_curation_schema"
 export AGR_CURATION_SCHEMA_URL="https://github.com/alliance-genome/agr_curation_schema"
-export AGR_CURATION_SCHEMA_VERSION="2.2.3"
+export AGR_CURATION_SCHEMA_VERSION="2.9.1"
 
 export LOGFILE=""
 export OUTPUT_DIR="."
