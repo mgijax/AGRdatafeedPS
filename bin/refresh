@@ -17,6 +17,7 @@ DO_GENERATE=""
 DO_VALIDATE=""
 DO_UPLOAD=""
 DO_NOCLEANUP=""
+DO_UPLOAD_TARGET="p"
 NO_RUN=""
 
 # ---------------------
@@ -45,7 +46,8 @@ Options:
         ca      Construct associations
         v       Variants
         y       Genotypes (AGRs)
-	d	Disease annotations
+        ya      Genotypes associations
+	    d	    Disease annotations
 
 	If no -p option is provided, all types are processed
 
@@ -54,6 +56,10 @@ You need to specify at least one of the following options to actually do anythin
 -v 	Validate data files specified in -p option. 
 -u      Upload files specified in -p option to the Alliance submission endpoint. 
 -U      Same as -u except cleanUp=false is passed (good for testing small samples).
+-ut     Upload target curation site and TARGET is one of "Production", "Beta", or "Alpha", default is "production"
+        p       Production (default)    https://curation.alliancegenome.org
+        b       Beta                    https://beta-curation.alliancegenome.org
+        a       Alpha                   https://alpha-curation.alliancegenome.org
 
 Debugging:
 -N	No execute. Skips actually running commands; just prints what it would do.
@@ -127,7 +133,24 @@ function upload {
   ftype=$1
   aftype=$2
   curation_system="curation" # also: alpha-curation, beta-curation
+  case "$DO_UPLOAD_TARGET" in
+    p)
+        curation_system="curation"
+        ;;
+    b)
+        curation_system="beta-curation"
+        ;;
+    a)
+        curation_system="alpha-curation"
+        ;;
+    *)
+        echo "Invalid upload target: $DO_UPLOAD_TARGET"
+        exit 1  # Exit with an error code
+        ;;
+  esac
+
   url="https://${curation_system}.alliancegenome.org/api/data/submit"
+  logit "Uploaded url: ${url}"
   if [[ ${DO_NOCLEANUP} ]] ; then
       url="${url}?cleanUp=false"
   fi
@@ -201,6 +224,11 @@ function parseCommandLine {
             DO_NOCLEANUP="true"
 	    DO_UPLOAD="true"
             ;;
+        -ut)
+           shift
+	       DO_UPLOAD_TARGET=${1}
+	    DO_UPLOAD="true"
+            ;;
 	-p)
 	    shift
 	    PARTS=(${1//,/ })
@@ -242,7 +270,8 @@ function doParts {
     doPart "c" "constructs.py -t constructs" "construct" "CONSTRUCT"
     doPart "ca" "constructs.py -t associations" "construct_association" "CONSTRUCT_ASSOCIATION"
     doPart "v" "variants.py" "variant" "VARIANT"
-    doPart "y" "agms.py"    "agm"    "AGM"
+    doPart "y" "agms.py -t genotypes"    "agm"    "AGM"
+    doPart "ya" "agms.py -t associations"    "agm_association"    "AGM_ASSOCIATION" 
     doPart "d" "diseaseAnnotations.py" "disease_annotation" "DISEASE_ANNOTATION"
 }
 
@@ -266,6 +295,14 @@ function main {
     logit "mkdir -p ${ODIR}"
     mkdir -p ${ODIR}
     checkexit
+
+    # Check if DO_UPLOAD_TARGET is 'p', 'b', or 'a'
+    if [[ "$DO_UPLOAD_TARGET" == "p" || "$DO_UPLOAD_TARGET" == "b" || "$DO_UPLOAD_TARGET" == "a" ]]; then
+        logit "Valid upload target: $DO_UPLOAD_TARGET"
+    else
+        logit "Invalid upload target: $DO_UPLOAD_TARGET", must be either "p" for production or "b" for beta or "a" for alpha
+        exit 1  # Exit with an error code
+    fi
 
     if [[ ${LOGFILE} ]]; then
         doParts >>${LOGFILE} 2>&1
