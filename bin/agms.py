@@ -2,6 +2,7 @@
 import db
 import json
 import re
+import argparse
 from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, setCommonFields
 
 def getAGMnames () :
@@ -92,7 +93,7 @@ def getAGMComponents () :
         })
     return gk2comps
 
-def getJsonObject (r, agmKey2name, genoKey2comps) :
+def getJsonObject (r, agmKey2name) :
     
     obj = {
         "primary_external_id" : r["accid"],
@@ -100,28 +101,46 @@ def getJsonObject (r, agmKey2name, genoKey2comps) :
         "taxon_curie": "NCBITaxon:10090",
         "data_provider_dto": getDataProviderDto(r["accid"], "genotype"),
         "internal": False,
-        "subtype_name" : "genotype",
-#        "component_dtos" : genoKey2comps.get(r["_genotype_key"],[]),
-
-# this property was in schema version 2.2.3 but removed 2.9.1, just comment out for now
-# version: 2.2.3
-# https://github.com/alliance-genome/agr_curation_schema/blob/83de40ce0989ab8231cbbc80538e46208fb55391/generated/jsonschema/allianceModel.schema.json#L1056
-# version: 2.9.1
-# https://github.com/alliance-genome/agr_curation_schema/blob/6a0e13c6fe60ad3cf4e31b3a13c7254cac36e251/generated/jsonschema/allianceModel.schema.json#L978
-
+        "subtype_name" : "genotype"
     }
     setCommonFields(r, obj)
     return obj
 
+def getOpts () :
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t','--type',choices=['genotypes','associations'],help="What to output.")
+    return parser.parse_args()
+
 def main () :
+    opts = getOpts()
     agmKey2name = getAGMnames()
     genoKey2comps = getAGMComponents()
     print('{')
     print(getHeaderAttributes())
-    print('"agm_ingest_set": [')
+    if opts.type == "genotypes":
+        print('"agm_ingest_set": [')
+    else:
+        print('"agm_allele_association_ingest_set": [')  
+    first=True          
     for j,r in mainQuery(getAGMs()):
+        if opts.type == "associations":
+            obj = {
+                "agm_subject_identifier": r["accid"],
+                "relation_name": "has_component",
+            }
+            objs = genoKey2comps.get(r["_genotype_key"], [])
+            if objs:
+                for obj in objs:
+                    obj["agm_subject_identifier"] = r["accid"]
+                    obj["relation_name"] = "has_component"
+                    if not first: print(",", end=' ')
+                    first = False
+                    print(json.dumps(obj))                                        
+            continue
+
+        # else opts.type == "genotypes"...
         if j: print(',', end='')
-        o = getJsonObject(r, agmKey2name, genoKey2comps)
+        o = getJsonObject(r, agmKey2name)
         print(json.dumps(o))
     print(']')
     print('}')
