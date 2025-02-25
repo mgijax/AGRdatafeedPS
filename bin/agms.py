@@ -124,15 +124,11 @@ def main () :
     first=True          
     for j,r in mainQuery(getAGMs()):
         if opts.type == "associations":
-            obj = {
-                "agm_subject_identifier": r["accid"],
-                "relation_name": "has_component",
-            }
             objs = genoKey2comps.get(r["_genotype_key"], [])
             if objs:
                 for obj in objs:
                     obj["agm_subject_identifier"] = r["accid"]
-                    obj["relation_name"] = "has_component"
+                    obj["relation_name"] = "contains"
                     if not first: print(",", end=' ')
                     first = False
                     print(json.dumps(obj))                                        
