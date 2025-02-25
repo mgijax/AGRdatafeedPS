@@ -17,7 +17,7 @@ DO_GENERATE=""
 DO_VALIDATE=""
 DO_UPLOAD=""
 DO_NOCLEANUP=""
-DO_UPLOAD_TARGET="p"
+DO_UPLOAD_TARGET=""
 NO_RUN=""
 
 # ---------------------
@@ -34,7 +34,7 @@ Current env settings:
     TOKEN_FILE=${TOKEN_FILE}
 	
 Options:
--h	Print this message and exit.
+-h Print this message and exit.
 -l file Specifies a log file. By default, log messages are sent to stdout. Overrides LOGFILE.
 
 -c n	Specifies the update count for this schema version (1, 2, 3, ...).  Optional.
@@ -47,23 +47,24 @@ Options:
         v       Variants
         y       Genotypes (AGRs)
         ya      Genotypes associations
-	    d	    Disease annotations
+        d       Disease annotations
 
 	If no -p option is provided, all types are processed
 
 You need to specify at least one of the following options to actually do anything:
--g      Generate data files specified in -p option.
--v 	Validate data files specified in -p option. 
--u      Upload files specified in -p option to the Alliance submission endpoint. 
--U      Same as -u except cleanUp=false is passed (good for testing small samples).
--ut     Upload target curation site and TARGET is one of "Production", "Beta", or "Alpha", default is "production"
-        p       Production (default)    https://curation.alliancegenome.org
-        b       Beta                    https://beta-curation.alliancegenome.org
-        a       Alpha                   https://alpha-curation.alliancegenome.org
+-g  Generate data files specified in -p option.
+-v  Validate data files specified in -p option. 
+-u  Upload files specified in -p option to the Alliance submission endpoint. 
+    Specify the upload target, the upload target is one of curation site: "Production", "Beta", or "Alpha"
+      p       Production (default)    https://curation.alliancegenome.org
+      b       Beta                    https://beta-curation.alliancegenome.org
+      a       Alpha                   https://alpha-curation.alliancegenome.org
+-U  Same as -u except cleanUp=false is passed (good for testing small samples).
+    Also need to specify the upload target: p, b or a
 
 Debugging:
--N	No execute. Skips actually running commands; just prints what it would do.
--s      Generate sample output (n=20)
+-N No execute. Skips actually running commands; just prints what it would do.
+-s Generate sample output (n=20)
 "
 }
 
@@ -219,15 +220,14 @@ function parseCommandLine {
 	    ;;  
 	-u) 
 	    DO_UPLOAD="true"
+        shift
+	    DO_UPLOAD_TARGET=${1}        
 	    ;;  
         -U)
+            shift
+	        DO_UPLOAD_TARGET=${1}        
             DO_NOCLEANUP="true"
-	    DO_UPLOAD="true"
-            ;;
-        -ut)
-           shift
-	       DO_UPLOAD_TARGET=${1}
-	    DO_UPLOAD="true"
+	        DO_UPLOAD="true"
             ;;
 	-p)
 	    shift
@@ -297,11 +297,13 @@ function main {
     checkexit
 
     # Check if DO_UPLOAD_TARGET is 'p', 'b', or 'a'
-    if [[ "$DO_UPLOAD_TARGET" == "p" || "$DO_UPLOAD_TARGET" == "b" || "$DO_UPLOAD_TARGET" == "a" ]]; then
-        logit "Valid upload target: $DO_UPLOAD_TARGET"
-    else
-        logit "Invalid upload target: $DO_UPLOAD_TARGET", must be either "p" for production or "b" for beta or "a" for alpha
-        exit 1  # Exit with an error code
+    if [ ${DO_UPLOAD} ]; then
+        if [[ "$DO_UPLOAD_TARGET" == "p" || "$DO_UPLOAD_TARGET" == "b" || "$DO_UPLOAD_TARGET" == "a" ]]; then
+            logit "Valid upload target: $DO_UPLOAD_TARGET"
+        else
+            logit "Invalid upload target: $DO_UPLOAD_TARGET", must be one of these: "p" for production, "b" for beta, "a" for alpha
+            exit 1  # Exit with an error code
+        fi
     fi
 
     if [[ ${LOGFILE} ]]; then
