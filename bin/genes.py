@@ -120,11 +120,37 @@ def getFormattedXrefs (mkey, xrefs, gsets) :
             xrs2.append(xrDto)
     return xrs2
 
+# build map from marker key to the list of notes for that marker
+def getGeneNotes () :
+    gene_notes = {}
+    for r in db.sql(qGeneNotes, 'auto'):
+        gene_notes.setdefault(r['_marker_key'], []).append(r)
+    return gene_notes
+
+# get gene notes in dto format
+def getGeneNoteDtos (mkey, gnotes) :
+    note_dtos = []
+    if not mkey in gnotes:  # no notes, just return the empty array
+        return note_dtos
+    
+    notes = gnotes[mkey]
+    if len(notes) < 1:   # no notes, just return the empty array
+        return note_dtos
+    
+    for note in notes:
+        note_dto = {
+            "note_type_name" : "MOD_provided_gene_description",
+            "free_text" : note["note"]
+        }
+        setCommonFields(note, note_dto)
+        note_dtos.append(note_dto)
+    return note_dtos
+
 # ----------------------------------------------------------
 # ----------------------------------------------------------
 
 
-def getJsonObject (r, xrefs, gsets) :
+def getJsonObject (r, xrefs, gsets, gnotes) :
     obj = {
         "primary_external_id" : r["accid"],
         "gene_type_curie" : MCV2SO[r['_mcvterm_key']],
@@ -146,19 +172,26 @@ def getJsonObject (r, xrefs, gsets) :
     }
     setCommonFields(r, obj)
     obj["cross_reference_dtos"] = getFormattedXrefs(r["_marker_key"], xrefs, gsets)
+
+    # add gene notes
+    note_dtos = getGeneNoteDtos(r["_marker_key"], gnotes)
+    if len(note_dtos) > 0:  # add gene dtos if exist
+         obj["note_dtos"] = note_dtos
+
     return obj
 
 def main () :
     initMCV2SO()
     xrefs = getXrefs()
     gsets = getGeneSets()
+    gnotes = getGeneNotes()
 
     print('{')
     print(getHeaderAttributes())
     print('"gene_ingest_set": [')
     for j,r in mainQuery(db.sql(qGenes, 'auto')):
         if j: print(',', end='')
-        o = getJsonObject(r, xrefs, gsets)
+        o = getJsonObject(r, xrefs, gsets, gnotes)
         print(json.dumps(o, indent=2))
     print(']')
     print('}')
@@ -224,6 +257,15 @@ qGeneHasExpressionImage = '''
     FROM GXD_Expression
     WHERE hasimage = 1
     '''
+
+# genes with notes
+qGeneNotes = ''' 
+    SELECT m._marker_key, n.note, n.creation_date, n.modification_date
+    FROM MRK_marker m, MRK_notes n
+    WHERE m._marker_key = n._marker_key
+    AND m._organism_key = 1 /* mouse, laboratory */
+    '''
+
 #########################################################
 
 if __name__ == "__main__":
