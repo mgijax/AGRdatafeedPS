@@ -159,7 +159,7 @@ def getJsonObject (cfg, r, ek2note, annotKey2inferred, submittedGeneIds) :
       "mod_internal_id" : unique_id,
       "evidence_code_curies": [ "ECO:0000033" ],  # all disease annots use TAS
       "annotation_type_name" : "manually_curated",
-      "reference_curie": "PMID:"+r["pmid"] if r["pmid"] else r["mgipubid"],
+      "evidence_curie": "PMID:"+r["pmid"] if r["pmid"] else r["mgipubid"],
       "data_provider_dto": getDataProviderDto(r["subjectid"], cfg["subjecttype"]),
       "do_term_curie": r["doid"],
       "disease_relation_name": cfg["predicate"],
