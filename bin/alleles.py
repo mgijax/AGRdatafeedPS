@@ -3,6 +3,7 @@ import sys
 import db
 import json
 import re
+import argparse
 from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields
 
 APPROVED_ALLELE_STATUS = 847114
@@ -130,7 +131,7 @@ def getAlleles () :
         ''' % (APPROVED_ALLELE_STATUS, AUTOLOAD_ALLELE_STATUS)
     return db.sql(q, 'auto')
 
-def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) :
+def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) :
     refs = ak2refs.get(r["_allele_key"], [])
     molecRefs = list(map(lambda r: r["preferredRefId"], filter(lambda r: r["_refassoctype_key"] == 1012, ak2refs.get(r['_allele_key'],[]))))
     allrefids = list(set(map(lambda r: r["preferredRefId"], refs)))
@@ -232,7 +233,12 @@ def getJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) 
     #
     return obj
 
-def main () :
+def getOpts () :
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t','--type',choices=['alleles','associations'],help="What to output.")
+    return parser.parse_args()
+
+def outputAlleles () :
     print('{')
     print(getHeaderAttributes())
     print('"allele_ingest_set": [')
@@ -245,10 +251,100 @@ def main () :
     ak2secids = getAlleleSecondaryIds ()
     for j,r in mainQuery(getAlleles()):
         if j: print(',', end='')
-        o = getJsonObject(r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids)
+        o = getAlleleJsonObject(r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids)
         print(json.dumps(o))
     print(']')
     print('}')
+
+def getAlleleOfAssociations () :
+    q = '''
+        SELECT aa.accid as alleleId, ma.accid as markerId, 'is_allele_of' as relationship, null as _refs_key
+        FROM ALL_Allele a, MRK_Marker m, ACC_Accession aa, ACC_Accession ma
+        WHERE a._marker_key = m._marker_key
+        AND m._marker_type_key = 1
+        AND m._marker_status_key = 1
+        AND m._organism_key = 1
+        AND a._allele_key = aa._object_key
+        AND aa._mgitype_key = 11
+        AND aa._logicaldb_key = 1
+        AND aa.preferred = 1
+        AND aa.private = 0
+        AND m._marker_key = ma._object_key
+        AND ma._mgitype_key = 2
+        AND ma._logicaldb_key = 1
+        AND ma.preferred = 1
+        AND ma.private = 0
+        AND a._allele_status_key in (%d,%d)
+        ''' % (APPROVED_ALLELE_STATUS, AUTOLOAD_ALLELE_STATUS)
+    return db.sql(q)
+
+def getMutationInvolvesAssociations () :
+    q = '''
+        SELECT aa.accid as alleleId, ma.accid as markerId, rt.term as relationship, ec.abbreviation as evidence, r.*
+        FROM MGI_Relationship r, ALL_Allele a, MRK_Marker m, ACC_Accession aa, ACC_Accession ma, VOC_Term rt, VOC_Term ec
+        WHERE r._category_key = 1003
+        AND r._relationshipterm_key = rt._term_key
+        AND r._evidence_key = ec._term_key
+        AND r._object_key_1 = a._allele_key
+        AND r._object_key_2 = m._marker_key
+        AND m._marker_type_key = 1
+        AND m._marker_status_key = 1
+        AND m._organism_key = 1
+        AND a._allele_key = aa._object_key
+        AND aa._mgitype_key = 11
+        AND aa._logicaldb_key = 1
+        AND aa.preferred = 1
+        AND aa.private = 0
+        AND m._marker_key = ma._object_key
+        AND ma._mgitype_key = 2
+        AND ma._logicaldb_key = 1
+        AND ma.preferred = 1
+        AND ma.private = 0
+        AND a._allele_status_key in (%d,%d)
+        ''' % (APPROVED_ALLELE_STATUS, AUTOLOAD_ALLELE_STATUS)
+    return db.sql(q)
+
+def getAlleleGeneAssociations () :
+    return getAlleleOfAssociations() + getMutationInvolvesAssociations()
+
+def getAssociationJsonObject (r) :
+    jobj = {
+        "allele_identifier" : r["alleleId"],
+        "gene_identifier" : r["markerId"],
+        "internal" : False,
+        "obsolete" : False,
+        "relation_name" : r["relationship"].replace(" ", "_"),
+    }
+    if r.has_key("_refs_key"):
+        rid = getPreferredRefId(r["_refs_key"])
+        if rid:
+            jobj["evidence_curies"] = [ rid ]
+    if r.has_key("evidence"):
+        eco = EVIDENCE_2_ECO.get(r["evidence"], None)
+        if eco:
+            jobj["evidence_code_curie"] = eco
+    setCommonFields(r, jobj)
+    return jobj
+
+def outputAssociations () :
+    print('{')
+    print(getHeaderAttributes())
+    print('"allele_gene_association_ingest_set": [')
+
+    for j,r in mainQuery(getAlleleGeneAssociations()):
+        if j: print(',', end='')
+        o = getAssociationJsonObject(r)
+        print(json.dumps(o))
+
+    print(']')
+    print('}')
+
+def main () :
+    opts = getOpts()
+    if opts.type == "alleles" :
+        outputAlleles()
+    elif opts.type == "associations" :
+        outputAssociations()
 
 ######
 # Translation tables 
@@ -312,6 +408,16 @@ MUTATION_2_SOID = dict([
     ("Not Specified",   None),
     ("Other",   None),
     ("Undefined",       None),
+    ])
+
+EVIDENCE_2_ECO = dict([
+    ("IGC", "ECO:0000317"),
+    ("IDA", "ECO:0000314"),
+    ("ISO", "ECO:0000266"),
+    ("IMP", "ECO:0000315"),
+    ("EXP", "ECO:0000269"),
+    ("IEA", "ECO:0000501"),
+    ("IGI", "ECO:0000316"),
     ])
 
 if __name__ == "__main__":

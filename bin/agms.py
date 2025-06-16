@@ -95,9 +95,15 @@ def getAGMComponents () :
 
 def getJsonObject (r, agmKey2name) :
     
+    name = (agmKey2name.get(r["_genotype_key"], "") + " [background:] " + symbolToHtml(r["strain"])).strip()
     obj = {
         "primary_external_id" : r["accid"],
-        "name" : (agmKey2name.get(r["_genotype_key"], "") + " [background:] " + symbolToHtml(r["strain"])).strip(),
+        "agm_full_name_dto" : {
+            "name_type_name": "full_name",
+            "display_text": name,
+            "format_text": name,
+            "internal": False,
+            },
         "taxon_curie": "NCBITaxon:10090",
         "data_provider_dto": getDataProviderDto(r["accid"], "genotype"),
         "internal": False,
