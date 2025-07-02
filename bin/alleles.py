@@ -5,9 +5,14 @@ import json
 import re
 import argparse
 from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields
+from genes import getSubmittedGeneIds
 
+# Currently only uploading alleles where status is pproved and autoload.
 APPROVED_ALLELE_STATUS = 847114
 AUTOLOAD_ALLELE_STATUS = 3983021
+IN_PROGRESS_ALLELE_STATUS = 847111
+DELETED_ALLELE_STATUS = 847112
+RESERVED_ALLELE_STATUS = 847113
 
 def getReferenceIds () :
     q = '''
@@ -133,7 +138,7 @@ def getAlleles () :
 
 def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) :
     refs = ak2refs.get(r["_allele_key"], [])
-    molecRefs = list(map(lambda r: r["preferredRefId"], filter(lambda r: r["_refassoctype_key"] == 1012, ak2refs.get(r['_allele_key'],[]))))
+    molecRefs = list(map(lambda r: r["preferredRefId"], filter(lambda r: r["_refassoctype_key"] == 1012, refs)))
     allrefids = list(set(map(lambda r: r["preferredRefId"], refs)))
     allrefids.sort()
     obj = {
@@ -261,7 +266,6 @@ def getAlleleOfAssociations () :
         SELECT aa.accid as alleleId, ma.accid as markerId, 'is_allele_of' as relationship, null as _refs_key
         FROM ALL_Allele a, MRK_Marker m, ACC_Accession aa, ACC_Accession ma
         WHERE a._marker_key = m._marker_key
-        AND m._marker_type_key = 1
         AND m._marker_status_key = 1
         AND m._organism_key = 1
         AND a._allele_key = aa._object_key
@@ -287,7 +291,6 @@ def getMutationInvolvesAssociations () :
         AND r._evidence_key = ec._term_key
         AND r._object_key_1 = a._allele_key
         AND r._object_key_2 = m._marker_key
-        AND m._marker_type_key = 1
         AND m._marker_status_key = 1
         AND m._organism_key = 1
         AND a._allele_key = aa._object_key
@@ -307,7 +310,10 @@ def getMutationInvolvesAssociations () :
 def getAlleleGeneAssociations () :
     return getAlleleOfAssociations() + getMutationInvolvesAssociations()
 
-def getAssociationJsonObject (r) :
+def getAssociationJsonObject (r, geneIds) :
+    if not r["markerId"] in geneIds:
+        return None
+
     jobj = {
         "allele_identifier" : r["alleleId"],
         "gene_identifier" : r["markerId"],
@@ -327,14 +333,18 @@ def getAssociationJsonObject (r) :
     return jobj
 
 def outputAssociations () :
+    geneIds = getSubmittedGeneIds()
     print('{')
     print(getHeaderAttributes())
     print('"allele_gene_association_ingest_set": [')
 
+    sep = ''
     for j,r in mainQuery(getAlleleGeneAssociations()):
-        if j: print(',', end='')
-        o = getAssociationJsonObject(r)
-        print(json.dumps(o))
+        o = getAssociationJsonObject(r, geneIds)
+        if o:
+            print(sep, end='')
+            print(json.dumps(o))
+            sep = ','
 
     print(']')
     print('}')

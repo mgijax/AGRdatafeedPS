@@ -3,7 +3,7 @@ import sys
 import db
 import json
 import re
-from genes import qGenes
+from genes import getSubmittedGeneIds
 from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, getTimeStamp, setCommonFields
 
 def getDiseaseAnnotations (cfg) :
@@ -48,14 +48,6 @@ def getDiseaseAnnotations (cfg) :
         AND ra.accid like 'MGI:%%'
         ''' % cfg
     return db.sql(q, 'auto')
-
-# When we set inferred_gene, want to only include ids for things we actually submitted.
-# This function imports/uses the query from genes.py to get this set.
-def getSubmittedGeneIds ():
-    ids = set()
-    for g in db.sql(qGenes, 'auto'):
-        ids.add(g['accid'])
-    return ids
 
 # Returns a mapping from _annot_key to inferred_allele/inferred_gene.
 # The query works by seeing if an _annot_key matches a back-reference for

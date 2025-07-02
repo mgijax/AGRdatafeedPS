@@ -11,28 +11,28 @@ from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQu
 # ----------------------------------------------------------
 
 MCV2SO = { 
-    #"complex/cluster/region"
-    6238175 : "SO:0000110",
+    #"complex/cluster/region" -> "biological_region"
+    6238175 : "SO:0001411",
     #"cytogenetic marker"
-    6238176 : "SO:0000110",
-    #"BAC/YAC end"
-    6238177 : "SO:0000110",
-    #"other genome feature"
-    6238178 : "SO:0000110",
-    #"DNA segment"
-    6238179 : "SO:0000110",
-    #"unclassified gene"
+    #6238176 : "SO:0000110",
+    #"BAC/YAC end" -> "chromosome_part"
+    6238177 : "SO:0000830",
+    #"other genome feature" -> "biological_region"
+    6238178 : "SO:0001411",
+    #"DNA segment" -> "biological_region"
+    6238179 : "SO:0001411",
+    #"unclassified gene" -> "gene"
     6238184 : "SO:0000704",
-    #"other feature type"
-    6238185 : "SO:0000110",
-    #"unclassified non-coding RNA gene"
-    6238186 : "SO:0000704",
+    #"other feature type" -> "biological_region"
+    6238185 : "SO:0001411",
+    #"unclassified non-coding RNA gene" -> "ncRNA_gene"
+    6238186 : "SO:0001263",
     #"unclassified cytogenetic marker"
-    7222413 : "SO:0000110",
-    #"unclassified other genome feature"
-    7648969 : "SO:0000110",
-    #"mutation defined region"
-    11928467 : "SO:0000110",
+    #7222413 : "SO:0000110",
+    #"unclassified other genome feature" -> "biological_region"
+    7648969 : "SO:0001411",
+    #"mutation defined region" -> "heritable_phenotypic_marker"
+    11928467 : "SO:0001500",
 }
 
 def initMCV2SO () :
@@ -44,8 +44,8 @@ def initMCV2SO () :
             ''' 
     for r in db.sql(q):
         m = so_re.search(r['note'])
-        if m:
-            MCV2SO[r['_term_key']] = m.group(0)
+        if m and r['_term_key'] not in MCV2SO:
+             MCV2SO[r['_term_key']] = m.group(0)
 
 # ----------------------------------------------------------
 # ----------------------------------------------------------
@@ -196,9 +196,39 @@ def main () :
     print(']')
     print('}')
 
+# Returns the set of MGI ids for submitted genes
+def getSubmittedGeneIds () :
+    ids = set()
+    for r in db.sql(qGenes):
+        ids.add(r['accid'])
+    return ids
 # ----------------------------------------------------------
 # Queries
 # ----------------------------------------------------------
+
+# Do not generate gene records for the following MCV types.
+excludeMcvKeys = ",".join([str(x) for x in [
+    # this group is being excluded because it was an MGI practice to always have a marker
+    # for an allele to refer to. We will not carry these markers over to the Alliance.
+    6238174, # Transgenes
+    7196768, # chromosomal deletion
+    7196774, # chromosomal duplication
+    7196770, # chromosomal inversion
+    7196773, # chromosomal translocation
+    7196775, # chromosomal transposition
+    7196769, # insertion
+    7196772, # reciprocal chromosomal translocation
+    7222413, # unclassified cytogenetic marker
+    7196771, # Robertsonian fusion
+    # This group is being excluded for now because we and the Alliance have not 
+    # decided how to deal with them yet.
+    6238173, # QTL
+    #97015609, # CTCF binding site
+    #36700088, # TSS cluster
+    #97015607, # enhancer
+    #15406207, # promoter
+    #15406205, # CpG island
+]])
 
 # Basic info for each gene
 qGenes = '''
@@ -210,7 +240,6 @@ qGenes = '''
         MRK_MCV_Cache mc
     WHERE
         mm._organism_key = 1
-        and mm._marker_type_key = 1
         and mm._marker_status_key = 1
         and mm._marker_key = mc._marker_key
         and mc.qualifier = 'D'
@@ -219,7 +248,8 @@ qGenes = '''
         and aa._logicaldb_key = 1
         and aa.preferred = 1
         and aa.private = 0
-    '''
+        and mc._mcvterm_key not in (%s)
+    ''' % excludeMcvKeys
 
 # Cross references
 qXrefs = '''
