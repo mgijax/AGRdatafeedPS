@@ -281,7 +281,8 @@ function main {
     #
     parseCommandLine $*
     #
-    ODIR=`realpath "${OUTPUT_DIR}/${AGR_CURATION_SCHEMA_VERSION}"`
+    ODIR=`realpath "${OUTPUT_DIR}"`
+    ODIR="${ODIR}/${AGR_CURATION_SCHEMA_VERSION}"
     if [[ ${RELEASE_COUNT} ]] ; then
 	ODIR="${ODIR}_${RELEASE_COUNT}"
     fi
