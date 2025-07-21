@@ -16,7 +16,7 @@ export AGR_CURATION_SCHEMA_URL="https://github.com/alliance-genome/agr_curation_
 export AGR_CURATION_SCHEMA_VERSION="2.12.0"
 
 export LOGFILE=""
-export OUTPUT_DIR="."
+export OUTPUT_DIR="${DATALOADSOUTPUT}/mgi/AGRdatafeedPS"
 export TOKEN_FILE="~/.DQM_UPLOAD_TOKEN_PS"
 
 # ---------------------
