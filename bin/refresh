@@ -158,7 +158,7 @@ function upload {
   fi
   token=`cat ${TOKEN_FILE}`
   setFile ${ftype}
-  command="curl \
+  command="curl --fail-with-body \
     -H \"Authorization: Bearer ${token}\" \
     -X POST \"${url}\" \
     -F \"${aftype}_MGI=@${FILE}\""
@@ -166,7 +166,7 @@ function upload {
   if [[ ${NO_RUN} ]] ; then
     return
   fi
-  curl \
+  curl --fail-with-body \
       -H "Authorization: Bearer ${token}" \
       -X POST "${url}" \
       -F "${aftype}_MGI=@${FILE}"
