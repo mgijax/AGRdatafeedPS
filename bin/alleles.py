@@ -4,7 +4,7 @@ import db
 import json
 import re
 import argparse
-from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields
+from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields, getPreferredRefId, getNotesOfType, getNoteDTO
 from genes import getSubmittedGeneIds
 
 # Currently only uploading alleles where status is pproved and autoload.
@@ -13,31 +13,6 @@ AUTOLOAD_ALLELE_STATUS = 3983021
 IN_PROGRESS_ALLELE_STATUS = 847111
 DELETED_ALLELE_STATUS = 847112
 RESERVED_ALLELE_STATUS = 847113
-
-def getReferenceIds () :
-    q = '''
-        SELECT a1._object_key as _refs_key, a1.accid as mgiid, a2.accid as pubmedid
-        FROM acc_accession a1
-          LEFT JOIN acc_accession a2
-          ON a1._object_key = a2._object_key
-          AND a2._mgitype_key = 1
-          AND a2._logicaldb_key = 29
-          AND a2.preferred = 1
-        WHERE a1._mgitype_key = 1
-          AND a1.prefixpart = 'MGI:'
-          AND a1._logicaldb_key = 1
-          AND a1.preferred = 1
-        '''
-    return indexResults(db.sql(q), '_refs_key', None, multi=False)
-
-rk2ids = getReferenceIds()
-def getPreferredRefId (rk):
-    if rk is None: return None
-    ids = rk2ids[rk] # every reference must have an entry, else error
-    if ids["pubmedid"]:
-        return "PMID:" + ids["pubmedid"]
-    else:
-        return ids["mgiid"]
 
 def getAlleleRefs () :
     q = '''
@@ -71,6 +46,9 @@ def getAlleleSynonyms () :
         '''
     mapper = lambda r : (r['synonym'], getPreferredRefId(r['_refs_key']))
     return indexResults(db.sql(q), '_allele_key', None, multi=True, mapper=mapper)
+
+def getAlleleMolecularNotes () :
+    return getNotesOfType(1021)
 
 def getAlleleAttributes () :
     q = '''
@@ -136,7 +114,7 @@ def getAlleles () :
         ''' % (APPROVED_ALLELE_STATUS, AUTOLOAD_ALLELE_STATUS)
     return db.sql(q, 'auto')
 
-def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids) :
+def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids, ak2mnotes) :
     refs = ak2refs.get(r["_allele_key"], [])
     molecRefs = list(map(lambda r: r["preferredRefId"], filter(lambda r: r["_refassoctype_key"] == 1012, refs)))
     allrefids = list(set(map(lambda r: r["preferredRefId"], refs)))
@@ -159,7 +137,8 @@ def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2se
             "internal" : False
         },
         "is_extinct" : (r["isextinct"] == 1),
-        "reference_curies" : allrefids
+        "reference_curies" : allrefids,
+        "note_dtos" : [],
     }
     setCommonFields(r, obj)
     # inheritance mode
@@ -235,6 +214,9 @@ def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2se
             "secondary_id" : s,
             "internal" : False,
         } for s in secids]
+    # molecular note
+    for n in ak2mnotes.get(r["_allele_key"],[]):
+        obj["note_dtos"].append(getNoteDTO(n, "mutation_description"))
     #
     return obj
 
@@ -247,16 +229,16 @@ def outputAlleles () :
     print('{')
     print(getHeaderAttributes())
     print('"allele_ingest_set": [')
-    rk2ids = getReferenceIds()
     ak2refs = getAlleleRefs()
     ak2trans = getAlleleTransmission()
     ak2syns = getAlleleSynonyms()
     ak2attrs = getAlleleAttributes()
     ak2muts = getAlleleMutations()
+    ak2mnotes = getAlleleMolecularNotes()
     ak2secids = getAlleleSecondaryIds ()
     for j,r in mainQuery(getAlleles()):
         if j: print(',', end='')
-        o = getAlleleJsonObject(r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids)
+        o = getAlleleJsonObject(r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids, ak2mnotes)
         print(json.dumps(o))
     print(']')
     print('}')

@@ -131,4 +131,57 @@ def setCommonFields (rec, obj, internal=False, obsolete=False) :
     if rec.has_key("modification_date"): obj["date_updated"] = getTimeStamp(rec["modification_date"])
     obj["created_by_curie"] = "MGI:curation_staff"
     obj["updated_by_curie"] = "MGI:curation_staff"
-    
+
+# Return a mapping from reference key to the MGI id and PMID (if available).
+def getReferenceIds () :
+    q = '''
+        SELECT a1._object_key as _refs_key, a1.accid as mgiid, a2.accid as pubmedid
+        FROM acc_accession a1
+          LEFT JOIN acc_accession a2
+          ON a1._object_key = a2._object_key
+          AND a2._mgitype_key = 1
+          AND a2._logicaldb_key = 29
+          AND a2.preferred = 1
+        WHERE a1._mgitype_key = 1
+          AND a1.prefixpart = 'MGI:'
+          AND a1._logicaldb_key = 1
+          AND a1.preferred = 1
+        '''
+    return indexResults(db.sql(q), '_refs_key', None, multi=False)
+
+# Return the preferred ID for a reference, given it ref key.
+# The preferred ID is the PMID, if there is one, otherswise the MGI id.
+rk2ids = None
+def getPreferredRefId (rk):
+    global rk2ids
+    if rk2ids is None:
+        rk2ids = getReferenceIds()
+    if rk is None: return None
+    ids = rk2ids[rk] # every reference must have an entry, else error
+    if ids["pubmedid"]:
+        return "PMID:" + ids["pubmedid"]
+    else:
+        return ids["mgiid"]
+
+
+# Get the MGI notes of the given note type.
+# Return an index of _object_key to the note record(s) for that object
+def getNotesOfType (noteTypeKey) :
+    q = '''SELECT *
+        FROM MGI_Note
+        WHERE _noteType_key = %s
+        ''' % noteTypeKey
+    k2n = {}
+    for r in db.sql(q) :
+        k2n.setdefault(r['_object_key'], []).append(r)
+    return k2n
+
+# Turns a note record (from the MGI_Note table) into a NoteDTO object for submission.
+# 
+def getNoteDTO ( r , noteTypeName="comment") :
+    rr = {
+    "note_type_name": noteTypeName,
+    "free_text": r["note"],
+    }
+    setCommonFields(r, rr)
+    return rr
