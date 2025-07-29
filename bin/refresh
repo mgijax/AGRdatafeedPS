@@ -11,7 +11,6 @@ source ../Configuration
 # Initialize vars
 RELEASE_COUNT=""
 DO_ALL="true"
-DO_SAMPLE=""
 VALIDATOR_DIR="../agr_curation_schema"
 DO_GENERATE=""
 DO_VALIDATE=""
@@ -65,7 +64,6 @@ You need to specify at least one of the following options to actually do anythin
 
 Debugging:
 -N No execute. Skips actually running commands; just prints what it would do.
--s Generate sample output (n=20)
 "
 }
 
@@ -209,10 +207,6 @@ function parseCommandLine {
 	    shift
 	    LOGFILE="$1"
 	    ;;
-        -s)
-            DO_SAMPLE="true"
-            export DO_SAMPLE
-            ;;
 	-g)
 	    DO_GENERATE="true"
 	    ;;
