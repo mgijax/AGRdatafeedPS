@@ -11,6 +11,7 @@ source ../Configuration
 # Initialize vars
 RELEASE_COUNT=""
 DO_ALL="true"
+DO_SAMPLE=""
 VALIDATOR_DIR="../agr_curation_schema"
 DO_GENERATE=""
 DO_VALIDATE=""
@@ -45,7 +46,7 @@ Options:
         c       Constructs
         ca      Construct associations
         v       Variants
-        y       Genotypes (AGRs)
+        y       Genotypes (AGMs)
         ya      Genotypes associations
         d       Disease annotations
 
@@ -64,6 +65,7 @@ You need to specify at least one of the following options to actually do anythin
 
 Debugging:
 -N No execute. Skips actually running commands; just prints what it would do.
+-s Generate sample output (n=20)
 "
 }
 
@@ -206,6 +208,10 @@ function parseCommandLine {
 	-l)
 	    shift
 	    LOGFILE="$1"
+	    ;;
+	-s)
+	    DO_SAMPLE="true"
+	    export DO_SAMPLE;
 	    ;;
 	-g)
 	    DO_GENERATE="true"
