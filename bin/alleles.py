@@ -6,6 +6,7 @@ import re
 import argparse
 from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields, getPreferredRefId, getNotesOfType, getNoteDTO
 from genes import getSubmittedGeneIds
+from constructs import getAlleleConstructRelationships
 
 # Currently only uploading alleles where status is pproved and autoload.
 APPROVED_ALLELE_STATUS = 847114
@@ -292,6 +293,21 @@ def getMutationInvolvesAssociations () :
 def getAlleleGeneAssociations () :
     return getAlleleOfAssociations() + getMutationInvolvesAssociations()
 
+def getAlleleConstructAssociations () :
+    aid2rels = getAlleleConstructRelationships()
+    aids = list(aid2rels.keys())
+    aids.sort()
+    jobjs = []
+    for a in aids:
+        jobj = {
+            "allele_identifier" : a,
+            "construct_identifier" : a + "_con",
+            "relation_name": "contains",
+            "internal" : False,
+        }
+        jobjs.append(jobj)
+    return jobjs
+
 def getAssociationJsonObject (r, geneIds) :
     if not r["markerId"] in geneIds:
         return None
@@ -320,6 +336,7 @@ def outputAssociations () :
     print(getHeaderAttributes())
     print('"allele_gene_association_ingest_set": [')
 
+    # allele-gene associations
     sep = ''
     for j,r in mainQuery(getAlleleGeneAssociations()):
         o = getAssociationJsonObject(r, geneIds)
@@ -327,8 +344,18 @@ def outputAssociations () :
             print(sep, end='')
             print(json.dumps(o))
             sep = ','
-
     print(']')
+
+    # allele-construct associations
+    sep = ''
+    print(',')
+    print('"allele_construct_association_ingest_set": [')
+    for jobj in getAlleleConstructAssociations():
+        print(sep, end='')
+        print(json.dumps(jobj))
+        sep = ','
+    print(']')
+
     print('}')
 
 def main () :

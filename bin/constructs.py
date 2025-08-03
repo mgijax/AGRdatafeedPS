@@ -129,6 +129,15 @@ def getOpts () :
     parser.add_argument('-t','--type',choices=['constructs','associations'],help="What to output.")
     return parser.parse_args()
 
+# Returns mapping from allele MGI id to list of relationship records for components.
+def getAlleleConstructRelationships () :
+    aid2rels = {}
+    for r in loadRelationship(EXPRESSES_cat_key):
+        aid2rels.setdefault(r['allele'],[]).append(r)
+    for r in loadRelationship(DRIVER_cat_key):
+        aid2rels.setdefault(r['allele'],[]).append(r)
+    return aid2rels
+    
 def main () :
     opts = getOpts()
     loadNonMouseGeneIds()
@@ -136,11 +145,7 @@ def main () :
     loadConstructNotes()
     # Get all relationship records for alleles (expresses-component and driven-by).
     # Then aggregate them into a single list of components per allele.
-    aid2rels = {}
-    for r in loadRelationship(EXPRESSES_cat_key):
-        aid2rels.setdefault(r['allele'],[]).append(r)
-    for r in loadRelationship(DRIVER_cat_key):
-        aid2rels.setdefault(r['allele'],[]).append(r)
+    aid2rels = getAlleleConstructRelationships()
     aids = list(aid2rels.keys())
     #
     print('{')
@@ -329,4 +334,5 @@ qConstructNotes = '''
     AND r._category_key IN (1004,1006)
 '''
 
-main()
+if __name__ == "__main__":
+    main()
