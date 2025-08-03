@@ -146,11 +146,32 @@ def getGeneNoteDtos (mkey, gnotes) :
         note_dtos.append(note_dto)
     return note_dtos
 
+# build map from marker key to list of synonyms
+def getGeneSynonyms () :
+    gene_syns = {}
+    for r in db.sql(qGeneSynonyms, 'auto'):
+        gene_syns.setdefault(r['_marker_key'], []).append(r)
+    return gene_syns
+
+# get synonyms for a gene in dto format
+def getGeneSynonymDtos(mkey, gsyns):
+    syn_dtos = []
+    syns = gsyns.get(mkey, [])
+    for s in syns:
+        dto = {   
+          "name_type_name": "unspecified",
+          "format_text": s["synonym"],
+          "display_text": s["synonym"],
+          "synonym_scope_name": "exact",
+          "internal": False
+        }   
+        syn_dtos.append(dto)
+    return syn_dtos
+
 # ----------------------------------------------------------
 # ----------------------------------------------------------
 
-
-def getJsonObject (r, xrefs, gsets, gnotes) :
+def getJsonObject (r, xrefs, gsets, gnotes, gsynonyms) :
     obj = {
         "primary_external_id" : r["accid"],
         "gene_type_curie" : MCV2SO[r['_mcvterm_key']],
@@ -178,6 +199,11 @@ def getJsonObject (r, xrefs, gsets, gnotes) :
     if len(note_dtos) > 0:  # add gene dtos if exist
          obj["note_dtos"] = note_dtos
 
+    # add gene synonyms
+    syn_dtos = getGeneSynonymDtos(r["_marker_key"], gsynonyms)
+    if len(syn_dtos) > 0:
+        obj["gene_synonym_dtos"] = syn_dtos
+
     return obj
 
 def main () :
@@ -185,13 +211,14 @@ def main () :
     xrefs = getXrefs()
     gsets = getGeneSets()
     gnotes = getGeneNotes()
+    gsynonyms = getGeneSynonyms()
 
     print('{')
     print(getHeaderAttributes())
     print('"gene_ingest_set": [')
     for j,r in mainQuery(db.sql(qGenes, 'auto')):
         if j: print(',', end='')
-        o = getJsonObject(r, xrefs, gsets, gnotes)
+        o = getJsonObject(r, xrefs, gsets, gnotes, gsynonyms)
         print(json.dumps(o, indent=2))
     print(']')
     print('}')
@@ -250,6 +277,17 @@ qGenes = '''
         and aa.private = 0
         and mc._mcvterm_key not in (%s)
     ''' % excludeMcvKeys
+
+# Gene synonyms
+qGeneSynonyms = '''
+    SELECT DISTINCT ml._marker_key, ml.label as synonym
+    FROM mrk_label ml, mrk_marker m
+    WHERE ml._marker_key = m._marker_key
+    AND ml.labeltype in ('MS','MN','MY')
+    AND ml.labeltypename != 'human synonym'
+    AND ml.label != m.symbol
+    AND ml.label != m.name
+    '''
 
 # Cross references
 qXrefs = '''
