@@ -191,7 +191,7 @@ def main () :
             continue
 
         # else opts.type == "constructs"...
-        symbol = arels[0]["allelesymbol"] + ' construct'
+        symbol = symbolToHtml(arels[0]["allelesymbol"]) + ' construct'
         obj = {
           "internal" : False,
           "obsolete" : False,

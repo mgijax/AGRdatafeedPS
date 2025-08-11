@@ -31,6 +31,23 @@ def getAlleleRefs () :
 
     return indexResults(db.sql(q), '_allele_key', None, multi=True, mapper=mapper)
 
+# Returns index from allele MGI id to the _refs_key of its original reference
+def getOriginalRefs () :
+    q = '''
+        SELECT aa.accid as alleleId, aa._object_key as _allele_key, ra._refs_key, ra._refassoctype_key
+        FROM 
+          MGI_Reference_Assoc ra,
+          ACC_Accession aa
+        WHERE 1 = 1
+        AND ra._refassoctype_key = 1011
+        AND aa._object_key = ra._object_key
+        AND aa._mgitype_key = 11
+        AND aa._logicaldb_key = 1
+        AND aa.preferred = 1
+        '''
+    return indexResults(db.sql(q), 'alleleId', None, multi=False, mapper=lambda x:getPreferredRefId(x["_refs_key"]) )
+
+
 def getAlleleTransmission () :
     q = '''
         SELECT a._allele_key, t.term
@@ -117,6 +134,7 @@ def getAlleles () :
 
 def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2secids, ak2mnotes) :
     refs = ak2refs.get(r["_allele_key"], [])
+    origRefs  = list(map(lambda r: r["preferredRefId"], filter(lambda r: r["_refassoctype_key"] == 1011, refs)))
     molecRefs = list(map(lambda r: r["preferredRefId"], filter(lambda r: r["_refassoctype_key"] == 1012, refs)))
     allrefids = list(set(map(lambda r: r["preferredRefId"], refs)))
     allrefids.sort()
@@ -217,7 +235,9 @@ def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2se
         } for s in secids]
     # molecular note
     for n in ak2mnotes.get(r["_allele_key"],[]):
-        obj["note_dtos"].append(getNoteDTO(n, "mutation_description"))
+        n["evidence_curies"] = molecRefs
+        dto = getNoteDTO(n, "mutation_description")
+        obj["note_dtos"].append(dto)
     #
     return obj
 
@@ -295,6 +315,8 @@ def getAlleleGeneAssociations () :
 
 def getAlleleConstructAssociations () :
     aid2rels = getAlleleConstructRelationships()
+    aid2oref = getOriginalRefs()
+    
     aids = list(aid2rels.keys())
     aids.sort()
     jobjs = []
@@ -303,18 +325,23 @@ def getAlleleConstructAssociations () :
             "allele_identifier" : a,
             "construct_identifier" : a + "_con",
             "relation_name": "contains",
+            "evidence_curies" : [],
             "internal" : False,
         }
+        oref = aid2oref.get(a, None)
+        if oref:
+            jobj["evidence_curies"] = [ oref ]
         jobjs.append(jobj)
     return jobjs
 
-def getAssociationJsonObject (r, geneIds) :
+def getGeneAssociationJsonObject (r, geneIds) :
     if not r["markerId"] in geneIds:
         return None
 
     jobj = {
         "allele_identifier" : r["alleleId"],
         "gene_identifier" : r["markerId"],
+        "evidence_curies" : [],
         "internal" : False,
         "obsolete" : False,
         "relation_name" : r["relationship"].replace(" ", "_"),
@@ -339,7 +366,7 @@ def outputAssociations () :
     # allele-gene associations
     sep = ''
     for j,r in mainQuery(getAlleleGeneAssociations()):
-        o = getAssociationJsonObject(r, geneIds)
+        o = getGeneAssociationJsonObject(r, geneIds)
         if o:
             print(sep, end='')
             print(json.dumps(o))

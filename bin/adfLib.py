@@ -183,5 +183,7 @@ def getNoteDTO ( r , noteTypeName="comment") :
     "note_type_name": noteTypeName,
     "free_text": r["note"],
     }
+    if r.has_key("evidence_curies"):
+        rr["evidence_curies"] = r["evidence_curies"]
     setCommonFields(r, rr)
     return rr

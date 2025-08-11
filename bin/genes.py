@@ -3,7 +3,7 @@ import db
 import json
 import re
 
-from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, setCommonFields
+from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, setCommonFields, getPreferredRefId
 
 # ----------------------------------------------------------
 # Mapping from MCV term key to SO id.
@@ -33,6 +33,13 @@ MCV2SO = {
     7648969 : "SO:0001411",
     #"mutation defined region" -> "heritable_phenotypic_marker"
     11928467 : "SO:0001500",
+}
+
+SYNTYPE2SYNTYPE = {
+    "exact" : "exact",
+    "broad" : "broad",
+    "narrow" : "narrow",
+    "similar" : "related",
 }
 
 def initMCV2SO () :
@@ -160,11 +167,14 @@ def getGeneSynonymDtos(mkey, gsyns):
     for s in syns:
         dto = {   
           "name_type_name": "unspecified",
-          "format_text": s["synonym"],
-          "display_text": s["synonym"],
-          "synonym_scope_name": "exact",
+          "format_text": symbolToHtml(s["synonym"]),
+          "display_text": symbolToHtml(s["synonym"]),
+          "synonym_scope_name": SYNTYPE2SYNTYPE[s["synonymtype"]],
           "internal": False
         }   
+        rid = getPreferredRefId(s["_refs_key"])
+        if rid:
+            dto["evidence_curies"] = [ rid ]
         syn_dtos.append(dto)
     return syn_dtos
 
@@ -280,13 +290,11 @@ qGenes = '''
 
 # Gene synonyms
 qGeneSynonyms = '''
-    SELECT DISTINCT ml._marker_key, ml.label as synonym
-    FROM mrk_label ml, mrk_marker m
-    WHERE ml._marker_key = m._marker_key
-    AND ml.labeltype in ('MS','MN','MY')
-    AND ml.labeltypename != 'human synonym'
-    AND ml.label != m.symbol
-    AND ml.label != m.name
+    SELECT s._object_key as _marker_key, s.synonym, st.synonymtype, s._refs_key
+    FROM mgi_synonym s, mgi_synonymtype st
+    WHERE s._synonymtype_key = st._synonymtype_key
+    AND st._synonymtype_key in (1004,1005,1006,1007)
+    AND st._mgitype_key = 2
     '''
 
 # Cross references
