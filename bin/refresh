@@ -157,9 +157,10 @@ function upload {
       url="${url}?cleanUp=false"
   fi
   token=`cat ${TOKEN_FILE}`
+  auth="APIToken"  # possible values: APIToken, Bearer. For APIToken, use short token. For Bearer, use long. 
   setFile ${ftype}
   command="curl --fail-with-body \
-    -H \"Authorization: Bearer ${token}\" \
+    -H \"Authorization: ${auth} ${token}\" \
     -X POST \"${url}\" \
     -F \"${aftype}_MGI=@${FILE}\""
   logit "Uploading file with command: ${command}"
@@ -167,7 +168,7 @@ function upload {
     return
   fi
   curl --fail-with-body \
-      -H "Authorization: Bearer ${token}" \
+      -H "Authorization: ${auth} ${token}" \
       -X POST "${url}" \
       -F "${aftype}_MGI=@${FILE}"
   checkexit
