@@ -63,6 +63,10 @@ def loadRelationship (key) :
 # If the gene has a primary ID, returns a ConstructGenomicEntityAssociationDTO
 # Otherwise, returns a ConstructComponentSlotAnnotationDTO
 # (types defined in the Alliance schema)
+#
+# WTS2-1752 Suppress links to HBEGF in the Alliance feed
+#   Always return a ConstructComponentSlotAnnotationDTO for HBEGF 
+#
 def rel2constrComp (r, construct_id) :
     symbol = r["genesymbol"]
     gid = r["mgiid"]
@@ -94,7 +98,7 @@ def rel2constrComp (r, construct_id) :
     # NOTE: additional constraint that the marker type is gene. Only needed while 
     # Alliance persistent store contains only genes. When Allianec contains all markers,
     # can remove the added constraint.
-    if gid and r["_marker_type_key"] == 1:
+    if gid and r["_marker_type_key"] == 1 and symbol.upper() != "HBEGF":
         # we have an id for the gene. Return a ConstructGenomicEntityAssociationDTO
         rval = {
           "construct_identifier": construct_id,
@@ -108,7 +112,7 @@ def rel2constrComp (r, construct_id) :
         setCommonFields(r, rval)
         return ("ConstructGenomicEntityAssociationDTO", rval)
     else:
-        # don't have a curie for the gene. Return a ConstructComponentSlotAnnotationDTO
+        # don't have a curie for the gene or it's Hbegf. Return a ConstructComponentSlotAnnotationDTO
         rval = {
             "relation_name" : reln,
             "component_symbol" : symbol,
