@@ -28,8 +28,15 @@ import re
 import argparse
 from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields
 
+MUTATION_INVOLVES_cat_key = 1003
 EXPRESSES_cat_key = 1004
 DRIVER_cat_key = 1006
+ALL_cat_keys = "1003,1004,1006"
+
+knockdowns = set()
+def loadKnockdownAlleles () :
+    for r in db.sql(qKnockdownAlleles):
+        knockdowns.add(r['_allele_key'])
 
 mk2nmdId = {} # marker key -> non-mouse ID
 def loadNonMouseGeneIds () :
@@ -82,6 +89,8 @@ def rel2constrComp (r, construct_id) :
         reln = "expresses"
     elif r["_category_key"] == DRIVER_cat_key:
         reln = "is_regulated_by"
+    elif r["_category_key"] == MUTATION_INVOLVES_cat_key:
+        reln = "targets"
     else:
         raise RuntimeError("Internal error: unknown _category_key: " + str(r))
 
@@ -140,10 +149,14 @@ def getAlleleConstructRelationships () :
         aid2rels.setdefault(r['allele'],[]).append(r)
     for r in loadRelationship(DRIVER_cat_key):
         aid2rels.setdefault(r['allele'],[]).append(r)
+    for r in loadRelationship(MUTATION_INVOLVES_cat_key):
+        if r['_allele_key'] in knockdowns and r['relationship'] == 'decreased_translational_product_level': 
+            aid2rels.setdefault(r['allele'],[]).append(r)
     return aid2rels
     
 def main () :
     opts = getOpts()
+    loadKnockdownAlleles()
     loadNonMouseGeneIds()
     loadRefIds()
     loadConstructNotes()
@@ -225,6 +238,14 @@ def main () :
 # ------------------------------------------------
 # QUERIES.
 # ------------------------------------------------
+qKnockdownAlleles = '''
+    SELECT DISTINCT(a._object_key) as _allele_key
+    FROM voc_annot a, voc_term t
+    WHERE a._annottype_key = 1014
+    AND a._term_key = t._term_key
+    AND t.term = 'Knockdown'
+'''
+
 tConstructRelationships = ''' 
     SELECT 
         r._relationship_key,
@@ -243,7 +264,6 @@ tConstructRelationships = '''
         q.term as qualifier,
         e.abbreviation as evidencecode,
         r._refs_key,
-
         r.creation_date,
         r.modification_date,
         r._createdby_key,
@@ -301,14 +321,14 @@ qConstructNonMouseComponents = '''
         MRK_Marker m,
         ACC_Accession a
     WHERE
-        r._category_key in (1004,1006)
+        r._category_key in (%s)
     AND r._object_key_2 = m._marker_key
     AND m._organism_key != 1
     AND a._object_key = m._marker_key
     AND a._mgitype_key = 2
     AND a._logicaldb_key in (64,47,172,225) /* HGNC, RGD, ZFIN, Xenbase */
     AND a.preferred = 1
-    '''
+    ''' % ALL_cat_keys
 
 # query to return all construct association references
 qConstructRefs = '''
@@ -326,8 +346,8 @@ qConstructRefs = '''
             AND a2._mgitype_key = 1
             AND a2._logicaldb_key = 29
             AND a2.preferred = 1
-    WHERE r._category_key in (1004,1006)
-'''
+    WHERE r._category_key in (%s)
+''' % ALL_cat_keys
 
 # query to returns notes attached to construct associations
 qConstructNotes = '''
@@ -335,8 +355,8 @@ qConstructNotes = '''
     FROM mgi_note n, mgi_relationship r
     WHERE n._notetype_key = 1042
     AND n._object_key = r._relationship_key
-    AND r._category_key IN (1004,1006)
-'''
+    AND r._category_key IN (%s)
+''' % ALL_cat_keys
 
 if __name__ == "__main__":
     main()
