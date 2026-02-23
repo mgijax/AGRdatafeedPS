@@ -2,6 +2,7 @@
 import db
 import json
 import re
+from subprocess import Popen
 
 from adfLib import getHeaderAttributes, symbolToHtml, getDataProviderDto, mainQuery, setCommonFields, getPreferredRefId
 
@@ -53,6 +54,63 @@ def initMCV2SO () :
         m = so_re.search(r['note'])
         if m and r['_term_key'] not in MCV2SO:
              MCV2SO[r['_term_key']] = m.group(0)
+
+# ----------------------------------------------------------
+# ----------------------------------------------------------
+
+def getMarkerIDs () :
+    mid2mk = {}
+    for r in db.sql(qMgiIds):
+        mid2mk[r['mgiId']] = r['_marker_key']
+    return mid2mk
+
+# ----------------------------------------------------------
+# ----------------------------------------------------------
+
+# Returns a mapping from marker keys to PantherIDs.
+# Unlike other cross refs, this data is not stored in MGD, but has to be downloaded from PantherDB.
+# The following code downloads a file containing Panther-id-to-MGI-id associations,
+# converts the MGI ids to marker keys, and returns a dictionary from marker keys to Panther ids.
+# 
+PANTHERURL="https://data.pantherdb.org/ftp/ortholog/current_release/RefGenomeOrthologs.tar.gz"
+def getPantherIds () :
+    def parseMouseId (s) :
+        idPart = s.split("|")[1]
+        return "MGI:" + idPart.split("=")[-1]
+
+    def parseLine(line):
+        parts = line.split()
+        pthrId = parts[-1]
+        if parts[0].startswith('MOUSE'):
+            return (parseMouseId(parts[0]), pthrId)
+        elif parts[1].startswith('MOUSE'):
+            return (parseMouseId(parts[1]), pthrId)
+
+
+    cmd = 'curl -o "RefGenomeOrthologs.tar.gz" -z "RefGenomeOrthologs.tar.gz" "%s"' % PANTHERURL
+    sp = Popen(cmd, shell=True)
+    rc = sp.wait()
+    # tar outputs file names to stdout. Redirect to /dev/null so these don't end up
+    # in the json file.
+    cmd = 'tar -xvf RefGenomeOrthologs.tar.gz > /dev/null'
+    sp = Popen(cmd, shell=True)
+    rc = sp.wait()
+
+    # get a map from MGI id to marker key
+    mid2mk = getMarkerIDs()
+
+    # download the file and populate the result map.
+    mk2panther = {}
+    with open('RefGenomeOrthologs','r') as fd:
+        for line in fd:
+            res = parseLine(line[:-1])
+            if res:
+                mgiId = res[0]
+                pthrId = res[1]
+                mk = mid2mk.get(mgiId,None)
+                if mk:
+                    mk2panther[mk] = pthrId
+    return mk2panther
 
 # ----------------------------------------------------------
 # ----------------------------------------------------------
@@ -125,6 +183,16 @@ def getFormattedXrefs (mkey, xrefs, gsets) :
                 "internal" : False,
             }
             xrs2.append(xrDto)
+
+    pthrId = mk2panther.get(mkey,None)
+    if pthrId:
+        xrs2.append({
+            "display_name": "PANTHER:" + pthrId,
+            "referenced_curie" : "PANTHER:" + pthrId,
+            "page_area" : "default",
+            "prefix" : "PANTHER",
+            "internal" : False,
+        })
     return xrs2
 
 # build map from marker key to the list of notes for that marker
@@ -217,11 +285,13 @@ def getJsonObject (r, xrefs, gsets, gnotes, gsynonyms) :
     return obj
 
 def main () :
+    global mk2panther
     initMCV2SO()
     xrefs = getXrefs()
     gsets = getGeneSets()
     gnotes = getGeneNotes()
     gsynonyms = getGeneSynonyms()
+    mk2panther = getPantherIds()
 
     print('{')
     print(getHeaderAttributes())
@@ -307,6 +377,17 @@ qXrefs = '''
     and a._logicaldb_key = d._logicaldb_key
     and a.preferred = 1
     '''
+
+# Gene MGI ids
+qMgiIds = '''
+    SELECT m._marker_key, a.accid as mgiId
+    FROM ACC_Accession a, MRK_Marker m
+    WHERE a._object_key = m._marker_key
+    AND a._mgitype_key = 2
+    AND a._logicaldb_key = 1
+    AND a.preferred = 1
+    '''
+
 # genes with phenotype annots
 qGeneHasPhenotype = ''' 
     SELECT distinct _object_key as _marker_key
