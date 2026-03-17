@@ -37,10 +37,12 @@ MCV2SO = {
 }
 
 SYNTYPE2SYNTYPE = {
-    "exact" : "exact",
-    "broad" : "broad",
-    "narrow" : "narrow",
-    "similar" : "related",
+    "exact"      : "exact",
+    "broad"      : "broad",
+    "narrow"     : "narrow",
+    "similar"    : "related",
+    "old symbol" : "retired_name",
+    "old name"   : "retired_name",
 }
 
 def initMCV2SO () :
@@ -221,11 +223,23 @@ def getGeneNoteDtos (mkey, gnotes) :
         note_dtos.append(note_dto)
     return note_dtos
 
-# build map from marker key to list of synonyms
+# build map from marker key to list of synonyms. Combines synonyms in MGI_Synonym and former
+# nomenclature (symbols and names) from MRK_Label
 def getGeneSynonyms () :
     gene_syns = {}
     for r in db.sql(qGeneSynonyms, 'auto'):
         gene_syns.setdefault(r['_marker_key'], []).append(r)
+    for r in db.sql(qGeneOldLabels, 'auto'):
+        syns = gene_syns.setdefault(r['_marker_key'], [])
+        # Sometimes a former symbol (or name) is also curated as an exact synonym (often including a reference).
+        # Check to see if that's the case, and if so, change the synonym type from "exact" to "old symbol" (or "old name").
+        # Otherwise, just append the record normally.
+        for s in syns:
+            if s['synonym'] == r['synonym'] and s['synonymtype'] == 'exact':
+                s['synonymtype'] = r['synonymtype']
+                break
+        else:
+            syns.append(r)
     return gene_syns
 
 # get synonyms for a gene in dto format
@@ -367,6 +381,16 @@ qGeneSynonyms = '''
     AND st._mgitype_key = 2
     '''
 
+# Former symbols and names. Rename result columns to match qGeneSynonyms so they can be easily combined.
+qGeneOldLabels = '''
+    SELECT DISTINCT ml._marker_key, ml.label as synonym, ml.labeltypename as synonymtype, NULL::integer as _refs_key
+    FROM mrk_label ml, mrk_marker m
+    WHERE ml._marker_key = m._marker_key
+    AND ml.labeltypename in ('old symbol', 'old name')
+    AND ml.label != m.symbol
+    AND ml.label != m.name
+    '''
+
 # Cross references
 qXrefs = '''
     SELECT m._marker_key, a.accid, a._logicaldb_key, d.name as dbname, a.creation_date, a.modification_date
@@ -395,11 +419,11 @@ qGeneHasPhenotype = '''
     WHERE _annottype_key = 1015 /* MP-Gene */
     '''
 
-# genes for alleles in the IMPC collection
+# genes associated with the IMPC reference (J:211773)
 qGeneHasImpc = ''' 
     SELECT distinct _marker_key
-    FROM ALL_Allele
-    WHERE _collection_key = 24755824 /* IMPC */
+    FROM MRK_Reference
+    WHERE _refs_key = 212870
     '''
 
 # genes that have expression data
