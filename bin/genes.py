@@ -247,8 +247,12 @@ def getGeneSynonymDtos(mkey, gsyns):
     syn_dtos = []
     syns = gsyns.get(mkey, [])
     for s in syns:
+        name_type = 'unspecified'
+        if s["synonymtype"] in ['old symbol','old name']:
+            s["synonymtype"] = 'exact'
+            name_type = 'retired_name'
         dto = {   
-          "name_type_name": "unspecified",
+          "name_type_name": name_type,
           "format_text": symbolToHtml(s["synonym"]),
           "display_text": symbolToHtml(s["synonym"]),
           "synonym_scope_name": SYNTYPE2SYNTYPE[s["synonymtype"]],
