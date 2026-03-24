@@ -253,7 +253,7 @@ def getGeneSynonymDtos(mkey, gsyns):
             name_type = 'retired_name'
         dto = {   
           "name_type_name": name_type,
-          "format_text": symbolToHtml(s["synonym"]),
+          "format_text": s["synonym"],
           "display_text": symbolToHtml(s["synonym"]),
           "synonym_scope_name": SYNTYPE2SYNTYPE[s["synonymtype"]],
           "internal": False
@@ -276,13 +276,13 @@ def getJsonObject (r, xrefs, gsets, gnotes, gsynonyms) :
         "internal": False,
         "gene_symbol_dto" : {
             "name_type_name" : "nomenclature_symbol",
-            "format_text" : symbolToHtml(r["symbol"]),
+            "format_text" : r["symbol"],
             "display_text" : symbolToHtml(r["symbol"]),
             "internal" : False,
 	    },
         "gene_full_name_dto" : {
             "name_type_name" : "full_name",
-            "format_text" : symbolToHtml(r["name"]),
+            "format_text" : r["name"],
             "display_text" : symbolToHtml(r["name"]),
             "internal" : False
         }

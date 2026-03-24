@@ -145,13 +145,13 @@ def getAlleleJsonObject (r, ak2refs, ak2trans, ak2syns, ak2attrs, ak2muts, ak2se
         "internal": False,
         "allele_symbol_dto" : {
             "name_type_name" : "nomenclature_symbol",
-            "format_text" : symbolToHtml(r["symbol"]),
+            "format_text" : r["symbol"],
             "display_text" : symbolToHtml(r["symbol"]),
             "internal" : False,
         },
         "allele_full_name_dto" : {
             "name_type_name" : "full_name",
-            "format_text" : symbolToHtml(r["name"]),
+            "format_text" : r["name"],
             "display_text" : symbolToHtml(r["name"]),
             "internal" : False
         },
