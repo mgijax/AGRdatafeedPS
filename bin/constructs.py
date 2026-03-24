@@ -111,7 +111,7 @@ def rel2constrComp (r, construct_id) :
         # we have an id for the gene. Return a ConstructGenomicEntityAssociationDTO
         rval = {
           "construct_identifier": construct_id,
-          "genomic_entity_relation_name": reln,
+          "relation_name": reln,
           "genomic_entity_identifier": gid,
           "evidence_curies": [
             rk2id[r['_refs_key']]
