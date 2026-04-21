@@ -66,6 +66,12 @@ def getMarkerIDs () :
         mid2mk[r['mgiId']] = r['_marker_key']
     return mid2mk
 
+def getSecondaryIDs () :
+    mk2ids = {}
+    for r in db.sql(qMgiSecondaryIds):
+        mk2ids.setdefault(r['_marker_key'],[]).append(r['mgiId'])
+    return mk2ids
+
 # ----------------------------------------------------------
 # ----------------------------------------------------------
 
@@ -75,7 +81,7 @@ def getMarkerIDs () :
 # converts the MGI ids to marker keys, and returns a dictionary from marker keys to Panther ids.
 # 
 PANTHERURL="https://data.pantherdb.org/ftp/ortholog/current_release/RefGenomeOrthologs.tar.gz"
-def getPantherIds () :
+def getPantherIDs () :
     def parseMouseId (s) :
         idPart = s.split("|")[1]
         return "MGI:" + idPart.split("=")[-1]
@@ -267,7 +273,7 @@ def getGeneSynonymDtos(mkey, gsyns):
 # ----------------------------------------------------------
 # ----------------------------------------------------------
 
-def getJsonObject (r, xrefs, gsets, gnotes, gsynonyms) :
+def getJsonObject (r, xrefs, gsets, gnotes, gsynonyms, mk2secIds) :
     obj = {
         "primary_external_id" : r["accid"],
         "gene_type_curie" : MCV2SO[r['_mcvterm_key']],
@@ -300,6 +306,12 @@ def getJsonObject (r, xrefs, gsets, gnotes, gsynonyms) :
     if len(syn_dtos) > 0:
         obj["gene_synonym_dtos"] = syn_dtos
 
+    # add secondary ids
+    sec_ids = mk2secIds.get(r["_marker_key"], None)
+    if (sec_ids) :
+        sids = [ { "secondary_id":s, "internal":False } for s in sec_ids ]
+        obj["gene_secondary_id_dtos"] = sids
+
     return obj
 
 def main () :
@@ -309,14 +321,15 @@ def main () :
     gsets = getGeneSets()
     gnotes = getGeneNotes()
     gsynonyms = getGeneSynonyms()
-    mk2panther = getPantherIds()
+    mk2panther = getPantherIDs()
+    mk2secIds = getSecondaryIDs()
 
     print('{')
     print(getHeaderAttributes())
     print('"gene_ingest_set": [')
     for j,r in mainQuery(db.sql(qGenes, 'auto')):
         if j: print(',', end='')
-        o = getJsonObject(r, xrefs, gsets, gnotes, gsynonyms)
+        o = getJsonObject(r, xrefs, gsets, gnotes, gsynonyms, mk2secIds)
         print(json.dumps(o, indent=2))
     print(']')
     print('}')
@@ -414,6 +427,16 @@ qMgiIds = '''
     AND a._mgitype_key = 2
     AND a._logicaldb_key = 1
     AND a.preferred = 1
+    '''
+
+# Gene secondary MGI ids
+qMgiSecondaryIds = '''
+    SELECT m._marker_key, a.accid as mgiId
+    FROM ACC_Accession a, MRK_Marker m
+    WHERE a._object_key = m._marker_key
+    AND a._mgitype_key = 2
+    AND a._logicaldb_key = 1
+    AND a.preferred = 0
     '''
 
 # genes with phenotype annots
