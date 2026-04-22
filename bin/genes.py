@@ -69,7 +69,10 @@ def getMarkerIDs () :
 def getSecondaryIDs () :
     mk2ids = {}
     for r in db.sql(qMgiSecondaryIds):
-        mk2ids.setdefault(r['_marker_key'],[]).append(r['mgiId'])
+        accid = r['mgiId']
+        if accid.startswith("MGD-"):
+            accid = "MGD_old:" + accid
+        mk2ids.setdefault(r['_marker_key'],[]).append(accid)
     return mk2ids
 
 # ----------------------------------------------------------
