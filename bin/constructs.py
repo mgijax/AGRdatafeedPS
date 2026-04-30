@@ -33,11 +33,6 @@ EXPRESSES_cat_key = 1004
 DRIVER_cat_key = 1006
 ALL_cat_keys = "1003,1004,1006"
 
-knockdowns = set()
-def loadKnockdownAlleles () :
-    for r in db.sql(qKnockdownAlleles):
-        knockdowns.add(r['_allele_key'])
-
 mk2nmdId = {} # marker key -> non-mouse ID
 def loadNonMouseGeneIds () :
     for r in db.sql(qConstructNonMouseComponents):
@@ -144,6 +139,10 @@ def getOpts () :
 
 # Returns mapping from allele MGI id to list of relationship records for components.
 def getAlleleConstructRelationships () :
+    knockdowns = set()
+    for r in db.sql(qKnockdownAlleles):
+        knockdowns.add(r['_allele_key'])
+
     aid2rels = {}
     for r in loadRelationship(EXPRESSES_cat_key):
         aid2rels.setdefault(r['allele'],[]).append(r)
@@ -156,7 +155,6 @@ def getAlleleConstructRelationships () :
     
 def main () :
     opts = getOpts()
-    loadKnockdownAlleles()
     loadNonMouseGeneIds()
     loadRefIds()
     loadConstructNotes()
