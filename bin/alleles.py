@@ -22,7 +22,6 @@ def getAlleleRefs () :
           MGI_Reference_Assoc ra
         WHERE ra._refassoctype_key = rat._refassoctype_key
         AND rat._mgitype_key = 11
-        AND rat._refassoctype_key != 1014
         '''
 
     def mapper (r) :
