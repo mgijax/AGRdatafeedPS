@@ -265,7 +265,7 @@ def outputAlleles () :
 
 def getAlleleOfAssociations () :
     q = '''
-        SELECT aa.accid as alleleId, ma.accid as markerId, 'is_allele_of' as relationship, null as _refs_key
+        SELECT aa.accid as alleleId, ma.accid as markerId, 'is_allele_of' as relationship, null as _refs_key, null as note
         FROM ALL_Allele a, MRK_Marker m, ACC_Accession aa, ACC_Accession ma
         WHERE a._marker_key = m._marker_key
         AND m._marker_status_key = 1
@@ -286,8 +286,9 @@ def getAlleleOfAssociations () :
 
 def getMutationInvolvesAssociations () :
     q = '''
-        SELECT aa.accid as alleleId, ma.accid as markerId, rt.term as relationship, ec.abbreviation as evidence, r.*
-        FROM MGI_Relationship r, ALL_Allele a, MRK_Marker m, ACC_Accession aa, ACC_Accession ma, VOC_Term rt, VOC_Term ec
+        SELECT aa.accid as alleleId, ma.accid as markerId, rt.term as relationship, ec.abbreviation as evidence, r.*, n.note
+        FROM ALL_Allele a, MRK_Marker m, ACC_Accession aa, ACC_Accession ma, VOC_Term rt, VOC_Term ec, MGI_Relationship r
+	    LEFT JOIN MGI_Note n ON r._relationship_key = n._object_key AND n._notetype_key = 1042
         WHERE r._category_key = 1003
         AND r._relationshipterm_key = rt._term_key
         AND r._evidence_key = ec._term_key
@@ -353,6 +354,12 @@ def getGeneAssociationJsonObject (r, geneIds) :
         eco = EVIDENCE_2_ECO.get(r["evidence"], None)
         if eco:
             jobj["evidence_code_curie"] = eco
+    if r.has_key("note") and r["note"]:
+        jobj["note_dto"] = {
+	    "note_type_name" : "comment",
+	    "free_text" : r["note"],
+	    "internal" : False,
+	}
     setCommonFields(r, jobj)
     return jobj
 
