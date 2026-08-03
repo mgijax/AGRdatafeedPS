@@ -43,6 +43,7 @@ Options:
         g       Genes (and other features)
         a       Alleles
         aa      Allele associations
+	b	Antibodies
         c       Constructs
         ca      Construct associations
         v       Variants
@@ -270,6 +271,7 @@ function doParts {
     doPart "g" "genes.py"   "gene"   "GENE"
     doPart "a" "alleles.py -t alleles" "allele" "ALLELE"
     doPart "aa" "alleles.py -t associations" "allele_association" "ALLELE_ASSOCIATION"
+    doPart "b" "antibodies.py" "antibody" "ANTIBODY"
     doPart "c" "constructs.py -t constructs" "construct" "CONSTRUCT"
     doPart "ca" "constructs.py -t associations" "construct_association" "CONSTRUCT_ASSOCIATION"
     doPart "v" "variants.py" "variant" "VARIANT"
