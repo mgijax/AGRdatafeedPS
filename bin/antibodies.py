@@ -32,6 +32,16 @@ def getAntibodies () :
         '''
     return db.sql(q, 'auto')
 
+def getAntibodySynonyms () :
+    abk2synonyms = {}
+    q = '''
+        SELECT _antibody_key, alias
+        FROM gxd_antibodyalias
+        '''
+    for r in db.sql(q) :
+        abk2synonyms.setdefault(r['_antibody_key'],[]).append(r['alias'])
+    return abk2synonyms
+
 def getAntibodyGenes () :
     abk2geneIds = {}
     q = '''
@@ -80,7 +90,7 @@ def addNoteDTOs (r, obj) :
 
     return obj
 
-def getJsonObject (r, abk2geneIds, abk2refs) :
+def getJsonObject (r, abk2geneIds, abk2refs, abk2synonyms) :
     obj = {
         "primary_external_id" : r["accid"],
         "name" : r["antibodyname"],
@@ -89,19 +99,25 @@ def getJsonObject (r, abk2geneIds, abk2refs) :
         "internal": False,
         "antibody_target_gene_identifiers" : abk2geneIds.get(r['_antibody_key'],[]),
     }
+    #
+    syns = abk2synonyms.get(r['_antibody_key'], None)
+    if syns:
+        obj["secondary_identifiers"] = syns
+    #
     refs = abk2refs.get(r['_antibody_key'],[])
     if len(refs) > 0:
         obj["original_reference_curie"] = refs[0]
     if len(refs) > 1:
         obj["reference_curies"] = refs[1:]
-
+    #
     hci = r["heavy_chain"]
     if hci != "Not Applicable" :
         if hci == "Not Specified" :
             hci = "not_specified"
         obj["heavy_chain_isotype_name"] = hci
-
+    #
     addNoteDTOs(r, obj)
+    #
     setCommonFields(r, obj)
     return obj
 
@@ -112,9 +128,10 @@ def main () :
     first=True          
     abk2geneIds = getAntibodyGenes()
     abk2refs = getAntibodyRefs()
+    abk2synonyms = getAntibodySynonyms()
     for j,r in mainQuery(getAntibodies()):
         if j: print(',', end='')
-        o = getJsonObject(r, abk2geneIds, abk2refs)
+        o = getJsonObject(r, abk2geneIds, abk2refs, abk2synonyms)
         print(json.dumps(o))
     print(']')
     print('}')
