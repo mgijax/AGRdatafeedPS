@@ -107,20 +107,21 @@ def indexResults (results, keyfield, valuefield, multi=False, mapper=None) :
 # Examples:
 #       getDataProviderDto("DOID:123456", "disease/mgi")
 #       getDataProviderDto("MGI:567890", "gene")
-def getDataProviderDto (curie, pageArea):
-      i = curie.find(":")
-      prefix = curie[:i]
+def getDataProviderDto (curie = None, pageArea = None):
       dto = {
       	"source_organization_abbreviation": "MGI",  
-	"internal" : False,
-        "cross_reference_dto": {
-          "referenced_curie": curie,
-          "prefix": prefix,
-          "page_area": pageArea,
-          "display_name": curie,
-          "internal": False
-        }  
+        "internal" : False,
       }
+      if curie:
+          i = curie.find(":")
+          prefix = curie[:i]
+          dto["cross_reference_dto"] = {
+              "referenced_curie": curie,
+              "prefix": prefix,
+              "page_area": pageArea,
+              "display_name": curie,
+              "internal": False
+            }
       return dto 
 
 # Sets common fields in the object, based on values in the db record
