@@ -138,14 +138,15 @@ def getJsonObject (r, abk2geneIds, abk2refs, abk2synonyms, ok2taxonid) :
         "internal": False,
         "antibody_target_gene_identifiers" : abk2geneIds.get(r['_antibody_key'],[]),
     }
+    # Special case handling for rat because of data issue in MGI. See SPRT-395.
     #
-    taxid = getTaxonByOrganismKey(r['_organism_key'])
-    if taxid:
-        obj['host_taxon_term_name'] = taxid
+    taxon = getTaxonByOrganismKey(r['_organism_key']) if r['_organism_key'] != 40 else 'rat'
+    if taxon:
+        obj['host_taxon_term_name'] = taxon
     #
-    agtaxid = getTaxonByOrganismKey(r['_antigen_organism_key'])
-    if agtaxid:
-        obj['antigen_taxon_term_name'] = agtaxid
+    agtaxon = getTaxonByOrganismKey(r['_antigen_organism_key']) if r['_antigen_organism_key'] != 40 else 'rat'
+    if agtaxon:
+        obj['antigen_taxon_term_name'] = agtaxon
     #
     #addSynonymDTOs(r, obj, abk2synonyms)
 
