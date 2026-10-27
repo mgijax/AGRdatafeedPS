@@ -158,10 +158,9 @@ def getJsonObject (r, abk2geneIds, abk2refs, abk2synonyms, ok2taxonid) :
         obj["reference_curies"] = refs[1:]
     #
     hci = r["heavy_chain"]
-    if hci != "Not Applicable" :
-        if hci == "Not Specified" :
-            hci = "not_specified"
-        obj["heavy_chain_isotype_name"] = hci
+    if hci == "Not Applicable" or hci == "Not Specified":
+        hci = "not_specified"
+    obj["heavy_chain_isotype_name"] = hci
     #
     addNoteDTOs(r, obj)
     #
