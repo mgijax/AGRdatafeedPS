@@ -314,7 +314,7 @@ def getAlleleGeneAssociations () :
     return getAlleleOfAssociations() + getMutationInvolvesAssociations()
 
 def getAlleleConstructAssociations () :
-    aid2rels = getAlleleConstructRelationships()
+    aid2rels,aid2dates = getAlleleConstructRelationships()
     aid2oref = getOriginalRefs()
     
     aids = list(aid2rels.keys())
