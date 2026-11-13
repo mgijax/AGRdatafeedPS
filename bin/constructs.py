@@ -69,7 +69,7 @@ def loadRelationship (key) :
 # WTS2-1752 Suppress links to HBEGF in the Alliance feed
 #   Always return a ConstructComponentSlotAnnotationDTO for HBEGF 
 #
-def rel2constrComp (r, construct_id) :
+def rel2cassetteComp (r, cassette_id) :
     symbol = r["genesymbol"]
     gid = r["mgiid"]
     if gid is None:
@@ -103,9 +103,9 @@ def rel2constrComp (r, construct_id) :
     # Alliance persistent store contains only genes. When Allianec contains all markers,
     # can remove the added constraint.
     if gid and r["_marker_type_key"] == 1 and symbol.upper() != "HBEGF":
-        # we have an id for the gene. Return a ConstructGenomicEntityAssociationDTO
+        # we have an id for the gene. Return a CassetteGenomicEntityAssociationDTO
         rval = {
-          "construct_identifier": construct_id,
+          "cassette_identifier": cassette_id,
           "relation_name": reln,
           "genomic_entity_identifier": gid,
           "evidence_curies": [
@@ -114,9 +114,9 @@ def rel2constrComp (r, construct_id) :
         }
         if note_dto: rval["note_dtos"] = [ note_dto ]
         setCommonFields(r, rval)
-        return ("ConstructGenomicEntityAssociationDTO", rval)
+        return ("CassetteGenomicEntityAssociationDTO", rval)
     else:
-        # don't have a curie for the gene or it's Hbegf. Return a ConstructComponentSlotAnnotationDTO
+        # don't have a curie for the gene or it's Hbegf. Return a CassetteComponentSlotAnnotationDTO
         rval = {
             "relation_name" : reln,
             "component_symbol" : symbol,
@@ -130,7 +130,7 @@ def rel2constrComp (r, construct_id) :
             rval["taxon_curie"] = "NCBITaxon:" + r["taxonid"]
         if r["commonname"]:
             rval["taxon_text"] = r["commonname"]
-        return ("ConstructComponentSlotAnnotationDTO", rval)
+        return ("CassetteComponentSlotAnnotationDTO", rval)
     
 def getOpts () :
     parser = argparse.ArgumentParser()
@@ -144,6 +144,8 @@ def getAlleleConstructRelationships () :
         knockdowns.add(r['_allele_key'])
 
     aid2rels = {}
+    aid2dates = {}
+
     for r in loadRelationship(EXPRESSES_cat_key):
         aid2rels.setdefault(r['allele'],[]).append(r)
     for r in loadRelationship(DRIVER_cat_key):
@@ -151,8 +153,125 @@ def getAlleleConstructRelationships () :
     for r in loadRelationship(MUTATION_INVOLVES_cat_key):
         if r['_allele_key'] in knockdowns and r['relationship'] == 'decreased_translational_product_level': 
             aid2rels.setdefault(r['allele'],[]).append(r)
-    return aid2rels
+
+    for (aid,rels) in aid2rels.items():
+        minCreatedDate = None
+        maxUpdatedDate = None
+        for obj in rels:
+            if not minCreatedDate or (obj["creation_date"] < minCreatedDate):
+                minCreatedDate = obj["creation_date"]
+            if not maxUpdatedDate or (obj["modification_date"] > maxUpdatedDate):
+                maxUpdatedDate = obj["modification_date"]
+        #
+        aid2dates[aid] = {
+            "date_created": minCreatedDate,
+            "created_by_curie": "MGI:curation_staff",
+            "date_updated": maxUpdatedDate,
+            "updated_by_curie": "MGI:curation_staff"
+        }
+    #
+
+    return aid2rels, aid2dates
     
+def writeConstructsIngestSet (aid2rels, aid2dates, objType, idSuffix) :
+    print('"%s_ingest_set": [' % objType)
+    aids = list(aid2rels.keys())
+    first=True
+    for aid in aids:
+        construct_id = aid + idSuffix
+        arels = aid2rels[aid]
+        ccomps = []
+        cgassocs = []
+
+        for arel in arels:
+           tp, obj = rel2cassetteComp(arel, construct_id)
+           if tp == "CassetteComponentSlotAnnotationDTO":
+               ccomps.append(obj)
+           elif tp == "CassetteGenomicEntityAssociationDTO":
+               cgassocs.append(obj)
+           else:
+               raise RuntimeError("Unknown type: " + str(tp))
+
+        # else opts.type == "constructs"...
+        symbol = symbolToHtml(arels[0]["allelesymbol"]) + ' ' + objType
+        obj = {
+          "internal" : False,
+          "obsolete" : False,
+          "mod_internal_id" : construct_id,
+          "data_provider_dto": getDataProviderDto(aid, "allele"),
+        }
+        obj.update(aid2dates[aid])
+        obj[objType+'_symbol_dto'] = {
+              "name_type_name": "nomenclature_symbol",
+              "format_text": symbol,
+              "display_text": symbol,
+              "internal": False,
+        }
+        if objType == 'cassette' and len(ccomps):
+            obj["cassette_component_dtos"] = ccomps
+        #
+        if not first: print(",", end=' ')
+        print(json.dumps(obj, indent=2))
+        first=False
+        #
+    print("]")
+
+def writeConstructsFile (aid2rels, aid2dates) :
+    print('{')
+    print(getHeaderAttributes())
+    writeConstructsIngestSet(aid2rels, aid2dates, 'construct', '_con')
+    print(',')
+    writeConstructsIngestSet(aid2rels, aid2dates, 'cassette', '_cas')
+    print('}')
+
+def writeAssociationsIngestSet (aid2rels, aid2dates, objType, idSuffix) :
+    print('"%s_ingest_set": [' % objType)
+    aids = list(aid2rels.keys())
+    first=True
+    for aid in aids:
+        construct_id = aid + '_con'
+        cassette_id  = aid + '_cas'
+        arels = aid2rels[aid]
+        ccomps = []
+        cgassocs = []
+
+        for arel in arels:
+           tp, obj = rel2cassetteComp(arel, cassette_id)
+           if tp == "CassetteComponentSlotAnnotationDTO":
+               ccomps.append(obj)
+           elif tp == "CassetteGenomicEntityAssociationDTO":
+               cgassocs.append(obj)
+           else:
+               raise RuntimeError("Unknown type: " + str(tp))
+
+        if objType == 'construct_cassette_association':
+            obj = {
+              "construct_identifier": construct_id,
+              "relation_name": "has_component",
+              "cassette_identifier": cassette_id,
+              "internal": False,
+              "obsolete": False,
+            }
+            obj.update(aid2dates[aid])
+            if not first: print(",", end=' ')
+            first = False
+            print(json.dumps(obj, indent=2))
+        elif objType == 'cassette_genomic_entity_association':
+            for a in cgassocs:
+                if not first: print(",", end=' ')
+                first = False
+                print(json.dumps(a, indent=2))
+        #
+    print("]")
+
+def writeAssociationsFile (aid2rels, aid2dates) :
+    print('{')
+    print(getHeaderAttributes())
+    writeAssociationsIngestSet(aid2rels, aid2dates, 'construct_cassette_association', '_con')
+    print(',')
+    writeAssociationsIngestSet(aid2rels, aid2dates, 'cassette_genomic_entity_association', '_cas')
+    print('}')
+
 def main () :
     opts = getOpts()
     loadNonMouseGeneIds()
@@ -160,77 +279,12 @@ def main () :
     loadConstructNotes()
     # Get all relationship records for alleles (expresses-component and driven-by).
     # Then aggregate them into a single list of components per allele.
-    aid2rels = getAlleleConstructRelationships()
-    aids = list(aid2rels.keys())
-    #
-    print('{')
-    print(getHeaderAttributes())
-    if opts.type == "constructs":
-        print('"construct_ingest_set": [')
+    aid2rels, aid2dates = getAlleleConstructRelationships()
+
+    if opts.type == 'constructs':
+        writeConstructsFile(aid2rels, aid2dates)
     else:
-        print('"construct_genomic_entity_association_ingest_set": [')
-    first=True
-    for aid in aids:
-        construct_id = aid + '_con'
-        arels = aid2rels[aid]
-        ccomps = []
-        cgassocs = []
-
-        minCreatedDate = None
-        minCreatedBy = None
-        maxUpdatedDate = None
-        maxUpdatedBy = None
-       
-        for arel in arels:
-           tp, obj = rel2constrComp(arel, construct_id)
-           if tp == "ConstructComponentSlotAnnotationDTO":
-               ccomps.append(obj)
-           elif tp == "ConstructGenomicEntityAssociationDTO":
-               cgassocs.append(obj)
-           else:
-               raise RuntimeError("Unknown type: " + str(tp))
-
-           if not minCreatedDate or (obj["date_created"] < minCreatedDate):
-               minCreatedDate = obj["date_created"]
-               minCreatedBy = obj["created_by_curie"]
-
-           if not maxUpdatedDate or (obj["date_updated"] > maxUpdatedDate):
-               maxUpdatedDate = obj["date_updated"]
-               maxUpdatedBy = obj["created_by_curie"]
-
-        if opts.type == "associations":
-            for a in cgassocs:
-                if not first: print(",", end=' ')
-                first = False
-                print(json.dumps(a, indent=2))
-            continue
-
-        # else opts.type == "constructs"...
-        symbol = symbolToHtml(arels[0]["allelesymbol"]) + ' construct'
-        obj = {
-          "internal" : False,
-          "obsolete" : False,
-          "date_created" : minCreatedDate,
-          "created_by_curie" : minCreatedBy,
-          "date_updated" : maxUpdatedDate,
-          "updated_by_curie" : maxUpdatedBy,
-          "mod_internal_id" : construct_id,
-          "construct_symbol_dto" : {
-              "name_type_name": "nomenclature_symbol",
-              "format_text": symbol,
-              "display_text": symbol,
-              "internal": False,
-          },
-          "data_provider_dto": getDataProviderDto(aid, "allele"),
-        }
-        if len(ccomps): obj["construct_component_dtos"] = ccomps
-        #
-        if not first: print(",", end=' ')
-        print(json.dumps(obj, indent=2))
-        first=False
-        #
-    print("]}")
-
+        writeAssociationsFile(aid2rels, aid2dates)
 #
 
 # ------------------------------------------------
