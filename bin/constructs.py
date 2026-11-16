@@ -26,7 +26,7 @@ import db
 import json
 import re
 import argparse
-from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields
+from adfLib import getHeaderAttributes, symbolToHtml, indexResults, getDataProviderDto, mainQuery, log, setCommonFields, getTimeStamp
 
 MUTATION_INVOLVES_cat_key = 1003
 EXPRESSES_cat_key = 1004
@@ -164,9 +164,9 @@ def getAlleleConstructRelationships () :
                 maxUpdatedDate = obj["modification_date"]
         #
         aid2dates[aid] = {
-            "date_created": minCreatedDate,
+            "date_created": getTimeStamp(minCreatedDate),
             "created_by_curie": "MGI:curation_staff",
-            "date_updated": maxUpdatedDate,
+            "date_updated": getTimeStamp(maxUpdatedDate),
             "updated_by_curie": "MGI:curation_staff"
         }
     #
